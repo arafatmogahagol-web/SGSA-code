@@ -1,5 +1,5 @@
 {
-  "dataset": "Hill of Towie 2020 January-March pilot",
+  "dataset": "Hill of Towie January-March 2020",
   "source_doi": "10.5281/zenodo.14870023",
   "nodes": 21,
   "turbine_ids": [
@@ -80,5 +80,5 @@
   "inputs": "causal forward fill then training median",
   "normalization": "training-only mean/std over time and turbines",
   "availability": "native timestamp plus10min, then right-closed30min aggregation",
-  "oracle": "single seed2024; six lr/dropout candidates each; SGSA rho0.25 fixed; exploratory test selection, stop before full experiment"
+  "preprocessing_only": true
 }

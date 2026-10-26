@@ -1,0 +1,5 @@
+{
+  "dataset": "Hill of Towie",
+  "historical_preprocessing_annotation": "single seed2024; six lr/dropout candidates each; SGSA rho0.25 fixed; exploratory test selection, stop before full experiment",
+  "interpretation": "A historical development annotation, not an operation performed by prepare_data.py. Previously inspected development test periods are not untouched confirmation sets."
+}

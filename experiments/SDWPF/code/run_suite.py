@@ -1,4 +1,4 @@
-"""Restartable 36-training CUDA queue. Each optimizer step covers 32 windows."""
+"""Restartable 13-model CUDA benchmark. Each optimizer step covers 32 windows."""
 import argparse,csv,hashlib,json,os,random,subprocess,sys,time,traceback
 from pathlib import Path
 import numpy as np
@@ -9,6 +9,8 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from data_loader import load_and_prepare,Windows,loader
 from models import NAMES,build,parameter_counts,frequency_indices
+sys.path.insert(0,str(Path(__file__).resolve().parents[3]))
+from sgsa_utils.checkpoints import save_checkpoint
 
 ROOT=Path(__file__).resolve().parents[1]
 WORK=ROOT/'runs'
@@ -180,7 +182,7 @@ def train_one(name,strategy,seed):
         vm=evaluate(model,val,micro)
         record=dict(epoch=epoch,train_mse=total/count,val_mse=vm['mse'],val_mae=vm['mae'],val_rmse=vm['rmse'],seconds=time.perf_counter()-begin)
         history.append(record);csvwrite(out/'history.csv',history);print(name,strategy,seed,record,flush=True)
-        if vm['mse']<best:best=vm['mse'];stale=0;atomic_save(run/'best.pt',model.state_dict())
+        if vm['mse']<best:best=vm['mse'];stale=0;save_checkpoint(model,run/'best.pt')
         else:stale+=1
         atomic_save(run/'last.pt',dict(model=model.state_dict(),optimizer=opt.state_dict(),epoch=epoch,history=history,best=best,stale=stale,rng=rng_state(),frequency_indices=initial_indices))
         plot_loss(history,out/'loss')
@@ -216,7 +218,7 @@ def report():
     for ext in ['png','pdf']:fig.savefig(PAPER/f'comparison.{ext}',dpi=300)
     plt.close(fig)
     complete=list(PAPER.glob('*/*/*/complete.json'))
-    text='# SGSA unified 30-epoch benchmark\n\nCompleted trainings: '+str(len(complete))+'/36.\n\n'+summary.to_string()
+    text='# SGSA unified 30-epoch benchmark\n\nCompleted trainings: '+str(len(complete))+'/'+str(len(NAMES)*6)+'.\n\n'+summary.to_string()
     text+='\n\nMeans with fewer than 3 seeds are provisional. Controlled fixed configurations, no test-driven tuning. Previously inspected development panel. MultiGSA_adapted is not exact original-paper reproduction. LSTM/Transformer/FEDformer share weights across turbines; MTGNN/SGSA/MultiGSA_adapted aggregate turbines. No additional calendar inputs. Complex FEDformer parameters counted both as tensor entries and real scalar degrees of freedom. No significance claim from three-seed means alone.\n'
     (PAPER/'report.md').write_text(text)
 
@@ -234,7 +236,7 @@ def queue():
                 out=PAPER/name/strategy/str(seed)
                 if (out/'complete.json').exists():continue
                 out.mkdir(parents=True,exist_ok=True)
-                dump(PAPER/'queue_status.json',dict(stage='running',model=name,strategy=strategy,seed=seed,completed=len(list(PAPER.glob('*/*/*/complete.json'))),total=36,errors=errors))
+                dump(PAPER/'queue_status.json',dict(stage='running',model=name,strategy=strategy,seed=seed,completed=len(list(PAPER.glob('*/*/*/complete.json'))),total=len(NAMES)*6,errors=errors))
                 log=out/'train.log'
                 with log.open('a') as f:
                     rc=subprocess.call([sys.executable,'-u',__file__,'train','--model',name,'--strategy',strategy,'--seed',str(seed)],stdout=f,stderr=subprocess.STDOUT)
@@ -242,7 +244,7 @@ def queue():
                     error=dict(model=name,strategy=strategy,seed=seed,exit_code=rc)
                     errors.append(error);dump(out/'failure.json',error)
                 report()
-    dump(PAPER/'queue_status.json',dict(stage='complete' if not errors else 'finished_with_errors',completed=len(list(PAPER.glob('*/*/*/complete.json'))),total=36,errors=errors))
+    dump(PAPER/'queue_status.json',dict(stage='complete' if not errors else 'finished_with_errors',completed=len(list(PAPER.glob('*/*/*/complete.json'))),total=len(NAMES)*6,errors=errors))
     report()
 
 if __name__=='__main__':

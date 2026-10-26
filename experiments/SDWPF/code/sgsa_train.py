@@ -9,7 +9,7 @@ import numpy as np
 import torch
 from model import SGSA
 from data_loader import load_and_prepare,Windows,loader
-from evaluate import evaluate
+from sgsa_evaluate import evaluate
 
 def main():
     p=argparse.ArgumentParser();p.add_argument('--data',required=True);p.add_argument('--output',required=True);p.add_argument('--config',required=True);p.add_argument('--seed',type=int,choices=[2024,2025,2026],required=True);p.add_argument('--strategy',choices=['clean','noise'],required=True);a=p.parse_args()

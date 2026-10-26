@@ -27,10 +27,10 @@ class Temporal(nn.Module):
         return self.head(self.norm(z[:,-1])).reshape(b,n,48).permute(0,2,1)
 
 class MTGNNAdapter(nn.Module):
-    def __init__(self):
+    def __init__(self,device='cuda'):
         super().__init__();sys.path.insert(0,str(VENDOR/'MTGNN'))
         from net import gtnet
-        self.net=gtnet(True,True,2,21,torch.device('cuda'),dropout=.1,subgraph_size=20,node_dim=40,
+        self.net=gtnet(True,True,2,21,torch.device(device),dropout=.1,subgraph_size=20,node_dim=40,
             dilation_exponential=2,conv_channels=64,residual_channels=64,skip_channels=64,end_channels=128,
             seq_length=96,in_dim=7,out_dim=48,layers=3,propalpha=.05,tanhalpha=3,layer_norm_affline=True)
     def forward(self,x):return self.net(x.permute(0,3,2,1)).squeeze(-1)

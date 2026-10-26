@@ -1,4 +1,4 @@
-"""Six predeclared methods. Official MTGNN/FEDformer sources remain unchanged."""
+"""Thirteen benchmark methods with explicit adapters to official implementations."""
 import importlib.util, sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -8,7 +8,9 @@ from sgsa import SGSA
 from multigsa_adapted import MultiGSAAdapted
 
 VENDOR=Path(__file__).resolve().parents[3]/'vendor'
-NAMES=['SGSA','MultiGSA_adapted','LSTM','Transformer','MTGNN','FEDformer']
+NAMES=['SGSA','MultiGSA_adapted','LSTM','Transformer','MTGNN','FEDformer',
+       'GraphWaveNet','AGCRN','STID_no_calendar','DLinear','PatchTST',
+       'PDFormer_train_graph','StemGNN_power_only']
 
 class Temporal(nn.Module):
     def __init__(self,kind):
@@ -54,11 +56,24 @@ class FEDformerAdapter(nn.Module):
         return y[:,:,-1].reshape(b,n,48).permute(0,2,1)
 
 def build(name):
+    if name in ['FEDformer','PatchTST']:
+        from types import ModuleType
+        for key in list(sys.modules):
+            if key=='layers' or key.startswith('layers.'):sys.modules.pop(key)
+        package=ModuleType('layers')
+        package.__path__=[str(VENDOR/('FEDformer/layers' if name=='FEDformer' else 'PatchTST/PatchTST_supervised/layers'))]
+        sys.modules['layers']=package
     if name=='SGSA':return SGSA()
     if name=='MultiGSA_adapted':return MultiGSAAdapted(96,134,16,48,64,.1)
     if name in ['LSTM','Transformer']:return Temporal(name)
     if name=='MTGNN':return MTGNNAdapter()
     if name=='FEDformer':return FEDformerAdapter()
+    if name in ['GraphWaveNet','AGCRN','STID_no_calendar','DLinear','PatchTST']:
+        import adapters_extended
+        return adapters_extended.build(name)
+    if name in ['PDFormer_train_graph','StemGNN_power_only']:
+        import adapters_extra
+        return adapters_extra.build(name)
     raise ValueError(name)
 
 def parameter_counts(model):

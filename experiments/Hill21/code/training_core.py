@@ -3,6 +3,8 @@ import os,json,time,random,csv,hashlib,shutil,traceback,itertools,sys
 import numpy as np
 import torch
 from torch.utils.data import Dataset,DataLoader
+sys.path.insert(0,str(Path(__file__).resolve().parents[3]))
+from sgsa_utils.checkpoints import save_checkpoint
 # Model factory is supplied explicitly by worker.py
 ROOT=Path(__file__).resolve().parents[1]; PAPER=ROOT/'outputs'
 def write(p,d):p.parent.mkdir(parents=True,exist_ok=True);q=p.with_suffix(p.suffix+'.tmp');q.write_text(json.dumps(d,indent=2));q.replace(p)
@@ -25,14 +27,14 @@ class Windows(Dataset):
     bad=(rng.random(x.shape)<.05)&(~packet[...,None]);x[bad]=rng.choice([-8.,8.],bad.sum())
   return torch.from_numpy(x),torch.from_numpy(y),torch.from_numpy(m),t
 
-def loader(ds,shuffle,seed):
+def loader(ds,shuffle,seed,batch_size=32):
  g=torch.Generator().manual_seed(seed)
- return DataLoader(ds,batch_size=32,shuffle=shuffle,num_workers=0,generator=g)
+ return DataLoader(ds,batch_size=batch_size,shuffle=shuffle,num_workers=0,generator=g)
 @torch.no_grad()
 def evaluate(model,ds,save=None):
  model.eval();sa=ss=count=0;ah=np.zeros(48);sh=ah.copy();ch=ah.copy();pred=[];target=[];mask=[];times=[]
  for x,y,m,t in loader(ds,False,0):
-  p=model(x.cuda()).cpu().numpy();yy=y.numpy();mm=m.numpy();e=p-yy
+  p=model(x.to(next(model.parameters()).device)).cpu().numpy();yy=y.numpy();mm=m.numpy();e=p-yy
   sa+=np.abs(e)[mm].sum(dtype=np.float64);ss+=np.square(e)[mm].sum(dtype=np.float64);count+=int(mm.sum())
   ah+=(np.abs(e)*mm).sum((0,2));sh+=(e**2*mm).sum((0,2));ch+=mm.sum((0,2))
   if save is not None:pred.append(p);target.append(yy);mask.append(mm);times.extend(t.numpy().tolist())
@@ -54,9 +56,9 @@ def train(name,cfg,seed,strategy,path,data):
  model=build(name,data['x'].shape[1],data['x'].shape[2],cfg['dropout'],rho=cfg.get('rho',.25)).cuda();opt=torch.optim.AdamW(model.parameters(),lr=cfg['learning_rate'],weight_decay=1e-4)
  tr=Windows(data,'train',noise=strategy=='noise');val=Windows(data,'validation',noise=strategy=='noise')
  best=float('inf');stale=0;history=[];write(path/'config.json',dict(cfg,seed=seed,strategy=strategy,model=name,rho=cfg.get('rho',.25) if name=='SGSA' else None))
- for epoch in range(1,51):
+ for epoch in range(1,cfg.get('epochs',50)+1):
   model.train();tr.epoch=epoch;sa=ss=count=0;tick=time.time()
-  for x,y,m,_ in loader(tr,True,seed+epoch):
+  for x,y,m,_ in loader(tr,True,seed+epoch,cfg.get('batch_size',32)):
    x=x.cuda();y=y.cuda();m=m.cuda();opt.zero_grad(set_to_none=True);e=(model(x)-y)[m]
    if not len(e):continue
    loss=e.square().mean()
@@ -67,8 +69,8 @@ def train(name,cfg,seed,strategy,path,data):
   print(name,strategy,seed,cfg,history[-1],flush=True)
   status(stage='training',model=name,strategy=strategy,seed=seed,epoch=epoch,run=str(path),validation_mae=score['mae'])
   if score['mae']<best:
-   best=score['mae'];stale=0;torch.save(model.state_dict(),path/'best.pt');best_epoch=epoch
+   best=score['mae'];stale=0;save_checkpoint(model,path/'best.pt');best_epoch=epoch
   else:stale+=1
-  if stale>=8:break
+  if stale>=cfg.get('patience',8):break
  result=dict(best_validation_mae=best,best_epoch=best_epoch,epochs=len(history),parameters=sum(p.numel() for p in model.parameters()));write(path/'complete.json',result)
  del model,opt;torch.cuda.empty_cache();return result

@@ -1,6 +1,6 @@
 """Author implementations with explicit SDWPF adapters; no test-based selection.
 
-Vendor source is immutable. See adapter_notes.md for all deviations.
+Vendor source is immutable. See docs/IMPLEMENTATION_NOTES.md for benchmark adaptations.
 """
 from pathlib import Path
 from types import SimpleNamespace, ModuleType

@@ -1,8 +1,10 @@
+# Install the appropriate PyTorch/CUDA build for your machine first.
+torch>=2.1
 numpy
 pandas
 scipy
+sympy
 matplotlib
-torch>=2.0
 einops
 scikit-learn
 PyYAML

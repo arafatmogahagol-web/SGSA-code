@@ -1,0 +1,371 @@
+{
+  "python_sources_parsed": 323,
+  "hill_cached_preprocessing": {
+    "cached_arrays_exact_match": true,
+    "train_statistics_rtol": 6e-05,
+    "train_statistics_atol": 1e-05,
+    "shape": [
+      4369,
+      21,
+      7
+    ],
+    "split": [
+      0,
+      3058,
+      3713,
+      4369
+    ],
+    "windows": {
+      "train": 729,
+      "validation": 26,
+      "test": 26
+    },
+    "valid_test_points": 26187,
+    "raw_archive_rebuild_checked": false
+  },
+  "stemgnn_hash_checked_local_fetch": true,
+  "sdwpf_train_priors_regenerated": true,
+  "cli_help": [
+    {
+      "script": "experiments/SDWPF/code/sgsa_train.py",
+      "passed": true
+    },
+    {
+      "script": "experiments/SDWPF/code/sgsa_evaluate.py",
+      "passed": true
+    },
+    {
+      "script": "experiments/SDWPF/code/run_suite.py",
+      "passed": true
+    },
+    {
+      "script": "experiments/Hill21/code/worker.py",
+      "passed": true
+    },
+    {
+      "script": "tools/fetch_stemgnn.py",
+      "passed": true
+    }
+  ],
+  "date": "2026-10-26",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python": "3.12.4",
+  "torch": "2.6.0+cu124",
+  "cuda_available": false,
+  "model_forward_checks": [
+    {
+      "dataset": "Hill21",
+      "model": "AGCRN",
+      "output_shape": [
+        1,
+        48,
+        21
+      ],
+      "parameters": 771330
+    },
+    {
+      "dataset": "Hill21",
+      "model": "DLinear",
+      "output_shape": [
+        1,
+        48,
+        21
+      ],
+      "parameters": 9312
+    },
+    {
+      "dataset": "Hill21",
+      "model": "FEDformer",
+      "output_shape": [
+        1,
+        48,
+        21
+      ],
+      "parameters": 219271,
+      "checkpoint_roundtrip": "exact; wrong hash and absent modes rejected",
+      "original_six_checkpoints": [
+        {
+          "strategy": "clean",
+          "seed": 2024,
+          "validation_replay_gap": 4.351451865503009e-09
+        },
+        {
+          "strategy": "clean",
+          "seed": 2025,
+          "validation_replay_gap": 1.2763250345493304e-08
+        },
+        {
+          "strategy": "clean",
+          "seed": 2026,
+          "validation_replay_gap": 3.286006855507395e-08
+        },
+        {
+          "strategy": "noise",
+          "seed": 2024,
+          "validation_replay_gap": 1.6865550067635127e-09
+        },
+        {
+          "strategy": "noise",
+          "seed": 2025,
+          "validation_replay_gap": 2.5314735863091187e-09
+        },
+        {
+          "strategy": "noise",
+          "seed": 2026,
+          "validation_replay_gap": 1.9149442032073694e-09
+        }
+      ]
+    },
+    {
+      "dataset": "Hill21",
+      "model": "GraphWaveNet",
+      "output_shape": [
+        1,
+        48,
+        21
+      ],
+      "parameters": 761684
+    },
+    {
+      "dataset": "Hill21",
+      "model": "LSTM",
+      "output_shape": [
+        1,
+        48,
+        21
+      ],
+      "parameters": 74480
+    },
+    {
+      "dataset": "Hill21",
+      "model": "MTGNN",
+      "output_shape": [
+        1,
+        48,
+        21
+      ],
+      "parameters": 1988112
+    },
+    {
+      "dataset": "Hill21",
+      "model": "MultiGSA_adapted",
+      "output_shape": [
+        1,
+        48,
+        21
+      ],
+      "parameters": 29841
+    },
+    {
+      "dataset": "Hill21",
+      "model": "PatchTST",
+      "output_shape": [
+        1,
+        48,
+        21
+      ],
+      "parameters": 105728
+    },
+    {
+      "dataset": "Hill21",
+      "model": "PDFormer_train_graph",
+      "output_shape": [
+        1,
+        48,
+        21
+      ],
+      "parameters": 443441
+    },
+    {
+      "dataset": "Hill21",
+      "model": "SGSA",
+      "output_shape": [
+        1,
+        48,
+        21
+      ],
+      "parameters": 19024,
+      "original_checkpoint_test": {
+        "mae": 0.6207616803842926,
+        "rmse": 0.773222836767088,
+        "mse": 0.5978735552981428,
+        "valid_points": 26187,
+        "windows": 26
+      }
+    },
+    {
+      "dataset": "Hill21",
+      "model": "StemGNN_power_only",
+      "output_shape": [
+        1,
+        48,
+        21
+      ],
+      "parameters": 67410339
+    },
+    {
+      "dataset": "Hill21",
+      "model": "STID_no_calendar",
+      "output_shape": [
+        1,
+        48,
+        21
+      ],
+      "parameters": 104272
+    },
+    {
+      "dataset": "Hill21",
+      "model": "Transformer",
+      "output_shape": [
+        1,
+        48,
+        21
+      ],
+      "parameters": 81008
+    },
+    {
+      "dataset": "SDWPF",
+      "model": "AGCRN",
+      "output_shape": [
+        1,
+        48,
+        134
+      ],
+      "parameters": 807020
+    },
+    {
+      "dataset": "SDWPF",
+      "model": "DLinear",
+      "output_shape": [
+        1,
+        48,
+        134
+      ],
+      "parameters": 9312
+    },
+    {
+      "dataset": "SDWPF",
+      "model": "FEDformer",
+      "output_shape": [
+        1,
+        48,
+        134
+      ],
+      "parameters": 225040,
+      "checkpoint_roundtrip": "exact; wrong hash and absent modes rejected"
+    },
+    {
+      "dataset": "SDWPF",
+      "model": "GraphWaveNet",
+      "output_shape": [
+        1,
+        48,
+        134
+      ],
+      "parameters": 764520
+    },
+    {
+      "dataset": "SDWPF",
+      "model": "LSTM",
+      "output_shape": [
+        1,
+        48,
+        134
+      ],
+      "parameters": 75056
+    },
+    {
+      "dataset": "SDWPF",
+      "model": "MTGNN",
+      "output_shape": [
+        1,
+        48,
+        134
+      ],
+      "parameters": 5264032
+    },
+    {
+      "dataset": "SDWPF",
+      "model": "MultiGSA_adapted",
+      "output_shape": [
+        1,
+        48,
+        134
+      ],
+      "parameters": 34033
+    },
+    {
+      "dataset": "SDWPF",
+      "model": "PatchTST",
+      "output_shape": [
+        1,
+        48,
+        134
+      ],
+      "parameters": 105746
+    },
+    {
+      "dataset": "SDWPF",
+      "model": "PDFormer_train_graph",
+      "output_shape": [
+        1,
+        48,
+        134
+      ],
+      "parameters": 444017
+    },
+    {
+      "dataset": "SDWPF",
+      "model": "SGSA",
+      "output_shape": [
+        1,
+        48,
+        134
+      ],
+      "parameters": 23216,
+      "original_checkpoint_test": {
+        "mae": 0.6380496852663481,
+        "rmse": 0.9464085994387268,
+        "valid_points": 966746,
+        "valid_windows": 153
+      }
+    },
+    {
+      "dataset": "SDWPF",
+      "model": "StemGNN_power_only",
+      "output_shape": [
+        1,
+        48,
+        134
+      ],
+      "parameters": 67496332
+    },
+    {
+      "dataset": "SDWPF",
+      "model": "STID_no_calendar",
+      "output_shape": [
+        1,
+        48,
+        134
+      ],
+      "parameters": 163184
+    },
+    {
+      "dataset": "SDWPF",
+      "model": "Transformer",
+      "output_shape": [
+        1,
+        48,
+        134
+      ],
+      "parameters": 81584
+    }
+  ],
+  "training_started": false,
+  "limitations": [
+    "CPU frozen inference and single-batch forward checks; no new full GPU training replication.",
+    "SDWPF MTGNN CPU smoke check redirected upstream construction device only; production adapter remains CUDA.",
+    "Local conda audit used MKL_THREADING_LAYER=SEQUENTIAL to avoid duplicate OpenMP runtimes.",
+    "Raw Hill archive absent locally: cached panel transformations audited, full archive-to-cache rebuild not executed."
+  ]
+}

@@ -13,7 +13,8 @@ def run(source):
    blocks.append(base.merge(power,on=['TimeStamp','StationId'],how='outer',validate='one_to_one'))
  d=pd.concat(blocks,ignore_index=True);d['TimeStamp']=pd.to_datetime(d.TimeStamp);ids=np.sort(d.StationId.unique())
  if len(ids)!=21:raise ValueError(f'Expected21 turbines, got{len(ids)}')
- # All signals become available ten minutes after source timestamps, conservatively.
+ # Source timestamps already denote interval ends. The experimental protocol
+ # adds a conservative 10-minute availability lag; preserve it for cache parity.
  d['available']=d.TimeStamp+pd.Timedelta(minutes=10);d['bin']=d.available.dt.ceil('30min')
  d['yaw_sin']=np.sin(np.deg2rad(d['wtc_NacelPos_mean']));d['yaw_cos']=np.cos(np.deg2rad(d['wtc_NacelPos_mean']))
  features=selected[:4]+['yaw_sin','yaw_cos','wtc_ActPower_mean']
@@ -32,7 +33,7 @@ def run(source):
   if len(v)<20:raise ValueError('Too few evaluation windows')
  (ROOT/'data').mkdir(exist_ok=True)
  np.savez_compressed(ROOT/'data/panel.npz',x=x,y=y,mask=mask,raw=raw,mean=mean,std=std,median=median,timestamps=grid.asi8,turbine_ids=ids,**starts)
- audit=dict(dataset='Hill of Towie 2020 January-March pilot',source_doi='10.5281/zenodo.14870023',nodes=len(ids),turbine_ids=ids.tolist(),features=features,power_target='wtc_ActPower_mean measured active power in kW; not PowerRef',cadence_minutes=30,history_hours=48,forecast_hours=24,boundaries=[0,b1,b2,T],boundary_dates=[str(grid[b1]),str(grid[b2])],windows=counts,training_power_coverage=coverage.tolist(),target_mask='finite measured labels only; never forward-fill targets into loss',inputs='causal forward fill then training median',normalization='training-only mean/std over time and turbines',availability='native timestamp plus10min, then right-closed30min aggregation',oracle='single seed2024; six lr/dropout candidates each; SGSA rho0.25 fixed; exploratory test selection, stop before full experiment')
+ audit=dict(dataset='Hill of Towie January-March 2020',source_doi='10.5281/zenodo.14870023',nodes=len(ids),turbine_ids=ids.tolist(),features=features,power_target='wtc_ActPower_mean measured active power in kW; not PowerRef',cadence_minutes=30,history_hours=48,forecast_hours=24,boundaries=[0,b1,b2,T],boundary_dates=[str(grid[b1]),str(grid[b2])],windows=counts,training_power_coverage=coverage.tolist(),target_mask='finite measured labels only; never forward-fill targets into loss',inputs='causal forward fill then training median',normalization='training-only mean/std over time and turbines',availability='source end timestamp plus protocol-specific10min lag, then right-closed30min means',preprocessing_only=True)
  (ROOT/'data_audit.json').write_text(json.dumps(audit,indent=2));print(json.dumps(audit,indent=2),flush=True)
 if __name__=='__main__':
  import sys;run(Path(sys.argv[1]))

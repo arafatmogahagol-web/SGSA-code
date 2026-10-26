@@ -1,19 +1,21 @@
-# SGSA: two-dataset research package
+# SGSA: Static Graph–Statistical Attention
 
-SGSA uses a learned static turbine graph, a self-feature residual (rho=0.25), position encoding, temporal SimAM statistics and a direct multi-step prediction head. Both datasets use d=64, graph rank=16, history=96 and horizon=48. Datasets are trained separately.
+Research code for lightweight multi-turbine wind power forecasting. SGSA combines a learned static turbine graph, a scaled self-feature residual (rho=0.25), learnable positional encoding, temporal SimAM weighting, and a shared direct prediction head. History=96, horizon=48, hidden width=64, graph rank=16. Each dataset is trained separately.
 
-## Layout
-- `experiments/SDWPF`: 134 turbines, 16 variables; historical protocol and adapted baselines.
-- `experiments/Hill21`: 21 turbines, 7 variables; January–March 2020.
-- `vendor`: author implementations with their existing license files.
-- `provenance`: source records and packaged-file hashes.
+## Repository layout
+- `experiments/SDWPF/`: 134 turbines, 16 variables; configuration and all benchmark adapters.
+- `experiments/Hill21/`: Hill of Towie,21 turbines,7 variables; January–March2020.
+- `sgsa_utils/checkpoints.py`: strict checkpoint loading and hash-bound Fourier-index metadata.
+- `vendor/`: licensed third-party implementations with their original notices.
+- `docs/`: data protocols, implementation adaptations and development history.
 
-## Environment and data
-Use Linux with NVIDIA CUDA and a compatible PyTorch installation. Install PyTorch for the installed CUDA driver, then `pip install -r requirements.txt`. These are dependency names, not a claim that every future version is compatible. The source is portable, but no new training was performed while assembling this release.
+## Installation
+Use a separate Python environment. GPU training uses NVIDIA CUDA; install a matching PyTorch build, then run `pip install -r requirements.txt`. The original measurements used an RTX3080Ti. Consult `docs/DATA_PROTOCOLS.md` for the different dataset protocols.
 
-Raw data and checkpoints are not embedded in this code package. SDWPF source: https://doi.org/10.1038/s41597-024-03427-5 . Hill of Towie: https://doi.org/10.5281/zenodo.14870023 . Respect the original data licenses.
+## Data preparation
+Raw data and checkpoints are distributed separately from source code.
 
-SDWPF requires the audited historical `data_20000.npz` cache at `experiments/SDWPF/data/data_20000.npz`. Do not silently regenerate it using a different downsampling or feature order. Its split and preprocessing are in config.json and data_loader.py. Hill21 can be prepared from the 2020 source ZIP containing tblSCTurbine and tblSCTurGrid monthly CSVs:
+**Hill of Towie:** obtain the2020 archive from https://doi.org/10.5281/zenodo.14870023 . The six monthly CSVs used here are tblSCTurbine and tblSCTurGrid for January–March2020. They may remain in the full-year ZIP or in a ZIP containing only those six files.
 
 ```sh
 python experiments/Hill21/code/prepare_data.py /path/to/2020.zip
@@ -21,12 +23,26 @@ python experiments/Hill21/code/prepare_priors.py
 python experiments/Hill21/code/worker.py SGSA
 ```
 
-The Hill21 worker trains three seeds with clean/noise training and evaluates clean/corrupted inputs. Substitute `MultiGSA_adapted`, `AGCRN`, etc. for SGSA. 
+The worker uses fixed settings from config.json, three seeds and clean/noise training. No hyperparameter search runs as part of preprocessing or the worker. Substitute another model name, including FEDformer, to run that benchmark. To evaluate existing checkpoints without training:
 
-For SDWPF, run `code/run_suite.py preflight` from the experiment folder before `train --model SGSA --strategy clean --seed 2024`. The original six-model runner and the separate extended/extra adapter files are preserved; this release does not pretend the six-model queue automatically covers every adapter. `sgsa_train.py` and `sgsa_evaluate.py` provide explicit SGSA entry points; use `--help` for required file paths. Training and inference outputs go into dataset-local directories.
+```sh
+python experiments/Hill21/code/worker.py FEDformer --evaluate-only --device cpu
+```
 
-## Reproducibility status
-Read REPRODUCIBILITY.md before comparing results. The paper reports existing audited caches; moving files to this repository is not a new replication. Model-specific adapters are part of the experimental method, not exact reproductions of every original paper. Do not overwrite existing outputs.
+Place checkpoints and their run files under `experiments/Hill21/runs/<model>/<clean|noise>/<seed>/`. New checkpoints include `best.pt.metadata.json`. Six original FEDformer checkpoints can also load with the supplied SHA256-matched records in checkpoint_metadata/. Do not load an arbitrary FEDformer state_dict with newly randomized frequency modes.
 
-## Licenses
-Third-party implementations retain upstream notices. No blanket relicensing is asserted. Choose a license for original SGSA code before public release and retain all upstream licenses and citations.
+**SDWPF:** source https://doi.org/10.1038/s41597-024-03427-5 . Place the audited processed cache at `experiments/SDWPF/data/data_20000.npz`. The release identifies its hash and protocol; it does not substitute an unverified raw-to-cache recipe. Then:
+
+```sh
+python experiments/SDWPF/code/prepare_priors.py
+python experiments/SDWPF/code/run_suite.py preflight
+python experiments/SDWPF/code/run_suite.py train --model SGSA --strategy clean --seed 2024
+```
+
+Preflight discovers a feasible microbatch while preserving32 windows per optimizer step through gradient accumulation. The queue covers13 methods and78 training runs. Extended model adapters retain their documented differences from the original papers. For StemGNN only, first run `python tools/fetch_stemgnn.py`; its upstream source is fetched locally and is not redistributed here.
+
+## Reproducibility
+See REPRODUCIBILITY.md. Both experiments use chronological partitions, training-only normalization, finite-target masks, and input-only artificial corruption. Their preprocessing details and training settings differ. Existing data splits were inspected during development; this repository does not claim they are untouched confirmatory test sets.
+
+## Licensing
+No additional open-source license has currently been granted for repository-owned code. Public visibility alone is not a blanket permission to reuse it. Third-party components retain the licenses listed in THIRD_PARTY_NOTICES.md; preserve those notices. Dataset licenses are separate from code licenses. No third-party implementation is presented as original SGSA work.
