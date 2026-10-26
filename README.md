@@ -21,7 +21,7 @@ python experiments/Hill21/code/prepare_priors.py
 python experiments/Hill21/code/worker.py SGSA
 ```
 
-The Hill21 worker trains three seeds with clean/noise training and evaluates clean/corrupted inputs. Substitute `MultiGSA_adapted`, `AGCRN`, etc. for SGSA. FEDformer is blocked pending the audit described below.
+The Hill21 worker trains three seeds with clean/noise training and evaluates clean/corrupted inputs. Substitute `MultiGSA_adapted`, `AGCRN`, etc. for SGSA. 
 
 For SDWPF, run `code/run_suite.py preflight` from the experiment folder before `train --model SGSA --strategy clean --seed 2024`. The original six-model runner and the separate extended/extra adapter files are preserved; this release does not pretend the six-model queue automatically covers every adapter. `sgsa_train.py` and `sgsa_evaluate.py` provide explicit SGSA entry points; use `--help` for required file paths. Training and inference outputs go into dataset-local directories.
 
