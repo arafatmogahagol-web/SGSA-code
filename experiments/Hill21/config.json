@@ -1,0 +1,26 @@
+{
+  "dataset": "Hill of Towie January-March 2020",
+  "num_nodes": 21,
+  "input_dim": 7,
+  "d_model": 64,
+  "rho": 0.25,
+  "history": 96,
+  "horizon": 48,
+  "learning_rate": 0.001,
+  "dropout": 0.1,
+  "batch_size": 32,
+  "epochs": 50,
+  "patience": 8,
+  "selection": "validation MAE",
+  "seeds": [
+    2024,
+    2025,
+    2026
+  ],
+  "split": [
+    0,
+    3058,
+    3713,
+    4369
+  ]
+}

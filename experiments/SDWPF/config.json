@@ -1,0 +1,45 @@
+{
+  "status": "final_rho025",
+  "training_authorized": true,
+  "model": "SGSA",
+  "seq_len": 96,
+  "pred_len": 48,
+  "num_nodes": 134,
+  "input_dim": 16,
+  "d_model": 64,
+  "graph_rank": 16,
+  "rho": 0.25,
+  "dropout": 0.1,
+  "batch_size": 32,
+  "epochs": 30,
+  "patience": 5,
+  "learning_rate": 0.0005,
+  "weight_decay": 0.0001,
+  "split": {
+    "train": [
+      0,
+      14000
+    ],
+    "val": [
+      14000,
+      15000
+    ],
+    "unused": [
+      15000,
+      16000
+    ],
+    "test": [
+      16000,
+      20000
+    ]
+  },
+  "seeds": [
+    2024,
+    2025,
+    2026
+  ],
+  "train_stride": 4,
+  "evaluation_stride": 24,
+  "metric_scale": "training-only z-score",
+  "note": "Final rho selected by user on 2026-10-19; original rho0.5 results archived. Development test panel previously inspected."
+}

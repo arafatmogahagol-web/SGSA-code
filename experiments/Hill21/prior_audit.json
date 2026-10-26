@@ -1,0 +1,14 @@
+{
+  "source": "/root/autodl-tmp/ASTGNN_Workspace/experiments/hill2020_oracle_20261021/data/panel.npz",
+  "source_sha256": "42eb3d27d87573b68a4317a9ee8bad2a982bfda924ffc8e1da002b734f6c0018",
+  "fit_partition": [
+    0,
+    3058
+  ],
+  "validation_used": false,
+  "test_used": false,
+  "graph": "abs training power correlation top10 symmetric",
+  "dtw": "exact DTW of training-only mean 48-slot profiles",
+  "patterns": "3-step training segments, 16 centers, seed2024,30 Lloyd iterations",
+  "prior_sha256": "17009e96a9237b74c69f97f3dc75b623f8ab6046a49469a1747ebf4ec6ce9eae"
+}
