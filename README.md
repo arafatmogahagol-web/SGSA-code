@@ -43,4 +43,4 @@ Preflight discovers a feasible microbatch while preserving32 windows per optimiz
 See REPRODUCIBILITY.md. Both experiments use chronological partitions, training-only normalization, finite-target masks, and input-only artificial corruption. Their preprocessing details and training settings differ. Existing data splits were inspected during development; this repository does not claim they are untouched confirmatory test sets.
 
 ## Licensing
-No additional open-source license has currently been granted for repository-owned code. Public visibility alone is not a blanket permission to reuse it. Third-party components retain the licenses listed in THIRD_PARTY_NOTICES.md; preserve those notices. Dataset licenses are separate from code licenses. No third-party implementation is presented as original SGSA work.
+No additional open-source license has currently been granted for repository-owned code. 
