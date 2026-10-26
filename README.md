@@ -15,8 +15,7 @@ Use a separate Python environment. GPU training uses NVIDIA CUDA; install a matc
 ## Data preparation
 Raw data and checkpoints are distributed separately from source code.
 
-**Hill of Towie:** obtain the2020 archive from https://doi.org/10.5281/zenodo.14870023 . The six monthly CSVs used here are tblSCTurbine and tblSCTurGrid for January–March2020. They may remain in the full-year ZIP or in a ZIP containing only those six files.
-
+**Hill of Towie:** obtain the2020 archive from https://doi.org/10.5281/zenodo.14870023 . The six monthly CSVs used here are tblSCTurbine and tblSCTurGrid for January–March2020. 
 ```sh
 python experiments/Hill21/code/prepare_data.py /path/to/2020.zip
 python experiments/Hill21/code/prepare_priors.py
@@ -29,8 +28,7 @@ The worker uses fixed settings from config.json, three seeds and clean/noise tra
 python experiments/Hill21/code/worker.py FEDformer --evaluate-only --device cpu
 ```
 
-Place checkpoints and their run files under `experiments/Hill21/runs/<model>/<clean|noise>/<seed>/`. New checkpoints include `best.pt.metadata.json`. Six original FEDformer checkpoints can also load with the supplied SHA256-matched records in checkpoint_metadata/. Do not load an arbitrary FEDformer state_dict with newly randomized frequency modes.
-
+Place checkpoints and their run files under `experiments/Hill21/runs/<model>/<clean|noise>/<seed>/`. New checkpoints include `best.pt.metadata.json`. Six original FEDformer checkpoints can also load with the supplied SHA256-matched records in checkpoint_metadata/.
 **SDWPF:** source https://doi.org/10.1038/s41597-024-03427-5 . Place the audited processed cache at `experiments/SDWPF/data/data_20000.npz`. The release identifies its hash and protocol; it does not substitute an unverified raw-to-cache recipe. Then:
 
 ```sh
