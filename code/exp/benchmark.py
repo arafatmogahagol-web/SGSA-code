@@ -13,7 +13,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from data_provider import load_priors, windows
+from data_provider import dataset_root, load_priors, windows
 from models import NAMES, build
 from utils.checkpoints import load_checkpoint
 from utils.io import csvwrite, dump, sha256
@@ -68,7 +68,7 @@ def benchmark(dataset, cfg, data, dirs, model_names=None, warmup=None, repeats=N
                               device='cuda', priors=priors).cuda()
                 # Strict load: FEDformer frequency lists come from the hash-bound
                 # sidecar instead of being re-sampled.
-                load_checkpoint(model, checkpoint)
+                load_checkpoint(model, checkpoint, dataset_root(dataset) / 'checkpoint_metadata')
                 model.eval()
                 x = sample.repeat(batch, 1, 1, 1)
                 latency, peak = _timed_forward(model, x, warmup, repeats)

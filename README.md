@@ -1,149 +1,157 @@
 # SGSA: Static Graph with Statistical Attention
 
-Research code for lightweight multi-turbine wind power forecasting. SGSA combines a
-learned static turbine graph, a scaled self-feature residual (`rho=0.25`), learnable
-positional encoding, temporal SimAM weighting, and a shared direct prediction head.
-History=96, horizon=48, hidden width=64, graph rank=16. Each dataset is trained
-separately.
-
-The proposed model has a single implementation, `code/SGSA.py`. One framework serves both
-datasets: shapes and training settings come from `code/datasets/<name>/config.json`, so
-no dataset constant is hard-coded in the model, the data pipeline or the trainer.
+Lightweight multi-turbine wind power forecasting. SGSA combines a learned static turbine
+graph, a scaled self-feature residual (`rho=0.25`), learnable positional encoding, temporal
+SimAM weighting and a shared direct prediction head. History 96, horizon 48, hidden width
+64, graph rank 16.
 
 ## Layout
 
 ```
 code/
-├── SGSA.py                 proposed model (static graph + scaled residual + SimAM head)
-├── run.py                  single entry point: prepare / preflight / train / queue /
-│                           evaluate / benchmark / report
+├── SGSA.py                 proposed model
+├── run.py                  prepare / preflight / train / queue / evaluate / benchmark / report
+├── check.py                CPU structure and protocol checks
+├── requirements.txt        runtime dependencies
+├── tests/                  checkpoint and protocol regression tests
 ├── layers/simam.py         parameter-free temporal attention (paper Eq. 4)
 ├── models/                 13 compared architectures, one registry (models/__init__.py)
-│   ├── multigsa.py         MultiGSA_adapted (structural adaptation)
-│   ├── temporal.py         LSTM, Transformer (weights shared across turbines)
+│   ├── multigsa.py         MultiGSA_adapted
+│   ├── temporal.py         LSTM, Transformer
 │   ├── mtgnn.py            MTGNN
 │   ├── fedformer.py        FEDformer
 │   ├── extended.py         GraphWaveNet, AGCRN, STID, DLinear, PatchTST
 │   └── extra.py            PDFormer, StemGNN
-├── data_provider/          per-dataset preprocessing + windows + corruption
+├── data_provider/          per-dataset preprocessing, windows, corruption, priors
 │   ├── common.py           prepared-data container, window slicing, corruption levels
 │   ├── sdwpf.py            SDWPF cache loader (134 turbines, 16 variables)
 │   ├── hill21.py           Hill of Towie raw-to-panel builder (21 turbines, 7 variables)
-│   └── priors.py           training-only graph/DTW/pattern priors
-├── exp/                    trainer, evaluator, guards, cost benchmark, reporter
+│   └── priors.py           training-only graph / DTW / pattern priors
+├── exp/                    trainer, evaluator, protocol guards, cost benchmark, reporter
 ├── utils/                  checkpoint identity, seeding, plotting, parameter counting
 ├── datasets/
-│   ├── SDWPF/              config.json + data/, train_priors.npz (both untracked)
-│   └── Hill21/             config.json + data audit + FEDformer recovery records
-├── checkpoints/            trained weights, ignored by Git
-└── results/                metrics, tables and figures, ignored by Git
+│   ├── SDWPF/config.json
+│   └── Hill21/config.json
+├── checkpoints/            trained weights (not tracked)
+├── results/                metrics, figures, reports (not tracked)
+└── vendor/                 third-party implementations, unmodified
 ```
 
-Every dataset keeps its own folder: `code/datasets/SDWPF` and `code/datasets/Hill21` each
-hold the configuration, the audit record and the (untracked) data cache. Supporting
-records: `docs/EXPERIMENT_REVIEW_20261028.md` (protocol review against the manuscript) and
-`docs/PAPER_CODE_MAPPING.md` (claim-by-claim map).
+## Install
 
-## Installation
-Use a separate Python environment. GPU training uses NVIDIA CUDA; install a matching
-PyTorch build, then run `pip install -r requirements.txt`. The original measurements used
-an RTX 3080 Ti. CPU execution supports frozen evaluation and the integrity checks only.
+```sh
+pip install -r code/requirements.txt
+```
+
+GPU training needs a matching CUDA build of PyTorch; the original measurements used an
+RTX 3080 Ti. CPU execution supports frozen evaluation and the structural checks below.
+
+## Data
+
+Raw data and checkpoints are not redistributed.
+
+**SDWPF** (`code/datasets/SDWPF/data/data_20000.npz`, 134 turbines × 16 variables × 20,000
+steps, target `Patv`): available from https://doi.org/10.1038/s41597-024-03427-5 . The
+audited cache used here has SHA256
+`c3b9ce258774d422ff7938d4157eb859e8724ae0960dda348d293e34af0c9a84`; a different cache, feature
+order or sampling recipe is not automatically equivalent.
+
+**Hill of Towie** (21 turbines × 7 variables, January–March 2020): 2020 archive from
+https://doi.org/10.5281/zenodo.14870023 (CC-BY-4.0). The six monthly CSVs used here are
+`tblSCTurbine` and `tblSCTurGrid` for January–March. Build the panel from the archive:
+
+```sh
+python code/run.py prepare --dataset Hill21 --zip /path/to/2020.zip
+python code/run.py prepare --dataset SDWPF
+```
+
+`prepare` writes the cached panel and the training-only graph/DTW/pattern priors next to the
+dataset configuration. Neither step trains a model or chooses a configuration.
+
+**StemGNN** is not redistributed: place the upstream `models/base_model.py` from
+https://github.com/microsoft/StemGNN at `code/vendor/StemGNN/models/base_model.py` (no
+redistribution license was established). PDFormer also needs the training-only priors generated by `prepare`.
 
 ## Usage
 
 ```sh
-# 0) data: see below, then build the training-only priors
-python code/run.py prepare   --dataset Hill21 --zip /path/to/2020.zip
-python code/run.py prepare   --dataset SDWPF
-
-# 1) verify the protocol counts and pick a feasible microbatch
-python code/run.py preflight --dataset SDWPF
-
-# 2) one run, or the full grid (13 models x 2 strategies x 3 seeds)
+python code/run.py preflight --dataset SDWPF                      # verify counts, pick microbatch
 python code/run.py train     --dataset SDWPF --model SGSA --strategy clean --seed 2024
-python code/run.py queue     --dataset SDWPF
-
-# 3) score a checkpoint, or re-measure parameters / latency / peak memory
+python code/run.py queue     --dataset SDWPF                      # 13 models x 2 strategies x 3 seeds
 python code/run.py evaluate  --dataset Hill21 --model SGSA --checkpoint best.pt --device cpu
-python code/run.py benchmark --dataset SDWPF
-
-# 4) aggregate everything that finished
-python code/run.py report    --dataset SDWPF
+python code/run.py benchmark --dataset SDWPF                      # parameters, latency, peak memory
+python code/run.py report    --dataset SDWPF                      # aggregate finished runs
 ```
 
-All commands read `code/datasets/<name>/config.json`; `preflight` fails if the prepared
-data, the window counts or the valid-label count disagree with it.
+Every command reads `code/datasets/<name>/config.json`; `preflight` fails if the prepared
+data or the window counts disagree with it. Checkpoints are written to
+`code/checkpoints/<dataset>/<model>/<strategy>/<seed>/best.pt` with a hash-bound
+`best.pt.metadata.json` sidecar, results to `code/results/<dataset>/...`.
 
-## Data preparation
-Raw data and checkpoints are distributed separately from source code.
+## Protocol
 
-**Hill of Towie:** obtain the 2020 archive from https://doi.org/10.5281/zenodo.14870023 .
-The six monthly CSVs used here are `tblSCTurbine` and `tblSCTurGrid` for January–March
-2020. They may remain in the full-year ZIP or in a ZIP containing only those six files.
-`run.py prepare` writes `code/datasets/Hill21/data/panel.npz` plus `data_audit.json` and
-the training-only priors.
+| Item | SDWPF | Hill of Towie |
+|---|---|---|
+| Turbines/features | 134/16 | 21/7 |
+| Processed points | 20,000 | 4,369 |
+| Training / validation / test | [0,14000) / [14000,15000) / [16000,20000) | [0,3058) / [3058,3713) / [3713,4369) |
+| Unused interval | [15000,16000) | — |
+| History / horizon | 96 / 48 | 96 / 48 |
+| Train / evaluation stride | 4 / 24 | 4 / 24 |
+| Windows (train/val/test) | 3,465 / 40 / 165 | 729 / 26 / 26 |
+| Valid test points | 966,746 | 26,187 |
+| Learning rate / dropout | 0.0005 / 0.1 | 0.001 / 0.1 |
+| Max epochs / patience | 30 / 5 | 50 / 8 |
+| Checkpoint selection | validation MSE | validation MAE |
+| Efficiency protocol | warm-up 20 / 100 repetitions | warm-up 10 / 30 repetitions |
 
-**SDWPF:** source https://doi.org/10.1038/s41597-024-03427-5 . Place the audited processed
-cache at `code/datasets/SDWPF/data/data_20000.npz`. The release identifies its hash and
-protocol; it does not substitute an unverified raw-to-cache recipe. `run.py prepare` then
-builds the training-only priors.
+Both use a 30-minute grid and training-only z-score statistics. SDWPF imputes
+missing inputs with training medians; Hill21 first applies causal forward filling and
+then uses training medians for remaining gaps. Both use masked MSE training, batch 32,
+AdamW (weight decay 1e-4), gradient clipping 1 and seeds 2024/2025/2026.
+Labels are never imputed: a missing target stays masked and
+never enters the loss or the metrics. Input corruption (50 % clean, 30 % light packet loss,
+20 % heavy packet loss plus ±8 outliers) touches historical inputs only, and the corrupted
+evaluation set uses the fixed heavy configuration. All reported errors are on the
+training-only z-score scale, not in kW.
 
-Checkpoints are written to `code/checkpoints/<dataset>/<model>/<strategy>/<seed>/best.pt`
-with a `best.pt.metadata.json` sidecar that binds the weight hash to FEDformer's frequency
-index lists. The six original Hill21 recovery records stay in
-`code/datasets/Hill21/checkpoint_metadata/`. Extended model adapters retain their
-documented differences from the original papers. For StemGNN only, first run
-`python tools/fetch_stemgnn.py`; its upstream source is fetched locally and is not
-redistributed here.
+## Notes on the comparison
 
-## Verification without training
+- Twelve baselines are adapted implementations under this protocol, not reproductions of
+  the original papers' settings. `MultiGSA_adapted` is a structural adaptation of MultiGSA.
+- STID uses node identity without calendar inputs; DLinear and PatchTST are
+  channel-independent; PDFormer uses training-only graph priors; FEDformer uses zero
+  time-mark channels; StemGNN uses historical power only.
+- Three seeds are reported as mean ± sample standard deviation; no significance test is
+  claimed from them.
+- The released SDWPF runs used one fixed batch order per epoch
+  (`"shuffle_each_epoch": false`); Hill21 reshuffles each epoch.
+
+
+## Checks and checkpoint compatibility
+
 ```sh
-python tools/verify_sources.py         # packaged file hashes + Python syntax
-python tools/smoke_checks.py           # CPU forward checks, parameter counts vs the paper
-python tools/test_integrity_guards.py  # checkpoint rho, run reuse and window origins
+python code/check.py
+python -m unittest discover -s code/tests -v
 ```
-`verify_sources.py` checks the packaged hashes and parses every Python file without
-importing models or starting training. `smoke_checks.py` builds every architecture on CPU,
-compares the parameter counts with the values printed in Tables 4 and 7, cross-checks both
-dataset configurations against their audit records, runs the integrity guards and pings each
-entry point; it writes `provenance/smoke_checks.json`. Four adapters need inputs that are
-not redistributed (the training-only prior file for PDFormer and the separately fetched
-StemGNN source) and are reported as skipped. After an intentional source edit, regenerate
-the hash manifest with `python tools/update_manifest.py`.
 
-## Checkpoint and run identity
-New checkpoints carry a hash-bound sidecar that records the frequency index lists and the
-residual coefficient, so loading weights trained with a different `rho` fails even when all
-tensor names and shapes match. Plain historical `state_dict` files remain loadable, but they
-do not encode `rho`; the metadata record marks whether it was verified. Before a run
-directory is reused or resumed, its stored configuration is compared with the current one,
-including the shuffle choice, and a mismatch raises instead of silently mixing results.
-`python tools/test_integrity_guards.py` exercises these protections and checks that the
-window helper reproduces the paper's origins and counts.
+These checks use synthetic inputs on CPU, validate shapes and parameter counts, and
+exercise configuration/checkpoint safeguards. They do not reproduce the accuracy tables
+or GPU timing. Missing PDFormer priors and separately supplied StemGNN source are reported
+explicitly as skipped.
 
-## Disclosures
-Both evaluation panels were inspected during development, and both dataset configurations
-record how the hyperparameters were chosen:
+New weights are accompanied by hash-bound `.metadata.json` files. Keep these with the
+weights: FEDformer requires its saved Fourier modes, and SGSA metadata records rho.
+The six original Hill21 FEDformer recovery records remain under
+`code/datasets/Hill21/checkpoint_metadata/` and are accepted only for matching weight
+hashes. Plain historical SGSA state dictionaries do not establish rho by themselves;
+use the matching experiment configuration. Fresh training after refactoring is not a
+guarantee of bit-identical historical scores.
 
-- `code/datasets/SDWPF/config.json`: `rho` was compared at 0.5 and 0.25 on the development
-  test panel before being fixed at 0.25; the 0.5 runs are archived and are not reported.
-  The test period `[16000,20000)` is a development evaluation panel, not an untouched
-  confirmatory holdout.
-- `code/datasets/Hill21/config.json`: the learning rate and dropout were selected from a
-  six-candidate grid with seed 2024 by validation MAE; the processed test period was also
-  inspected during development.
-- All reported metrics are on the training-only z-score scale, not in kW.
-- `MultiGSA_adapted` is a documented structural adaptation, not a reproduction of the
-  original paper's configuration.
-- The released SDWPF runs used a fixed batch order on every epoch
-  (`shuffle_each_epoch=false` in the configuration); Hill21 reshuffles every epoch.
+## Third-party code
 
-## Reproducibility
-See `REPRODUCIBILITY.md` and `docs/PAPER_CODE_MAPPING.md`. Both experiments use
-chronological partitions, training-only normalization, finite-target masks, and
-input-only artificial corruption. Their preprocessing details and training settings
-differ. This repository does not claim that the evaluated panels are untouched
-confirmatory test sets.
-
-## Licensing
-No additional open-source license has currently been granted for repository-owned code.
+`code/vendor/` contains unmodified third-party implementations, each keeping its own
+license file: AGCRN (MIT), DLinear (Apache-2.0), FEDformer (MIT), GraphWaveNet (MIT-style),
+MTGNN (MIT), PatchTST (Apache-2.0), PDFormer (MIT), STID (Apache-2.0). StemGNN is fetched by
+the user. Dataset licenses are separate from code licenses. No additional open-source
+license is granted for the repository-owned code.

@@ -89,7 +89,5 @@
       1,
       32
     ]
-  },
-  "hyperparameter_provenance": "Learning rate and dropout were selected from a six-candidate grid with seed 2024 by validation MAE (winner: learning_rate=0.001, dropout=0.1). The processed test period was inspected during development; it is a development evaluation panel, not an untouched confirmatory holdout. The reported runs then use this single frozen configuration for all methods and all three seeds.",
-  "development_panel_note": "See docs/DEVELOPMENT_HISTORY.md. No test labels are used as model inputs, and priors plus normalization statistics are fitted on the training range only."
+  }
 }

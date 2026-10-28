@@ -32,7 +32,10 @@ def _install_vendor_packages(name):
     """Temporarily put the vendor's own ``layers``/``utils`` packages in place."""
     saved = {}
     for package_name, relative in VENDOR_PACKAGES[name].items():
-        saved[package_name] = sys.modules.pop(package_name, None)
+        saved[package_name] = {key: value for key, value in list(sys.modules.items())
+                               if key == package_name or key.startswith(package_name + '.')}
+        for key in saved[package_name]:
+            sys.modules.pop(key)
         vendor = ModuleType(package_name)
         vendor.__path__ = [str(VENDOR / relative)]
         sys.modules[package_name] = vendor
@@ -40,11 +43,11 @@ def _install_vendor_packages(name):
 
 
 def _restore_vendor_packages(saved):
-    for package_name, module in saved.items():
-        if module is None:
-            sys.modules.pop(package_name, None)
-        else:
-            sys.modules[package_name] = module
+    for package_name, modules in saved.items():
+        for key in list(sys.modules):
+            if key == package_name or key.startswith(package_name + '.'):
+                sys.modules.pop(key)
+        sys.modules.update(modules)
 
 
 def _construct(name, cfg, device, priors):

@@ -7,7 +7,7 @@ official file because of API changes in current PyTorch:
   a four-dimensional input; ``Conv2d`` is the intended operation.
 * (see ``models/extra.py`` for the StemGNN FFT replacements.)
 
-Everything else is imported as-is. See ``docs/IMPLEMENTATION_NOTES.md``.
+Everything else is imported as-is.
 """
 import sys
 

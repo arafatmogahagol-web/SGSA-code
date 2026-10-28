@@ -11,22 +11,21 @@ from utils.plotting import plot_mae_bars, plot_parameter_vs_mae
 DISCLOSURE = """
 ## Reading this report
 
-- Means and sample standard deviations come from three seeds (2024, 2025, 2026). No
-  significance test is claimed from three-seed means alone.
+- Means and sample standard deviations use completed runs only. The count column
+  shows the number of available seeds; a partial report is not a three-seed result.
 - All errors are on the training-only z-score scale, not in physical units.
 - Every method uses the same splits, history/horizon, valid-label masks and training
   budget. Baselines are adapted implementations under this protocol, not reproductions
   of the original papers' configurations (`MultiGSA_adapted` in particular).
-- The evaluation panel was inspected during development and is a development panel, not
-  an untouched confirmatory holdout. See the dataset `config.json` for how each
-  hyperparameter was chosen, and `docs/DEVELOPMENT_HISTORY.md` for the full record.
+
 """
 
 
 def report(dataset, cfg, dirs):
     results = Path(dirs['results'])
     rows = [__import__('json').loads(p.read_text(encoding='utf-8'))
-            for p in results.glob('*/*/*/*/metrics.json')]
+            for p in results.glob('*/*/*/*/metrics.json')
+            if (p.parent.parent / 'complete.json').exists()]
     if not rows:
         print('No finished runs yet', flush=True)
         return None

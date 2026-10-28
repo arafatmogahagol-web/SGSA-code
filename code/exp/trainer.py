@@ -33,11 +33,17 @@ def _now():
     return time.time()
 
 
+def resolve_shuffle(cfg, reshuffle=False):
+    """Keep each dataset's recorded default; the CLI flag can enable reshuffling."""
+    return bool(cfg['shuffle_each_epoch'] or reshuffle)
+
+
 def train_run(dataset, name, strategy, seed, cfg, data, dirs, device,
               micro=None, reshuffle=False, priors=None):
     """Train (or resume) one ``(dataset, model, strategy, seed)`` run and score it."""
     if not cfg.get('training_authorized', False):
         raise RuntimeError('Configuration is a draft: training is not authorized')
+    reshuffle = resolve_shuffle(cfg, reshuffle)
     run_dir = Path(dirs['checkpoints']) / name / strategy / str(seed)
     out_dir = Path(dirs['results']) / name / strategy / str(seed)
     run_dir.mkdir(parents=True, exist_ok=True)

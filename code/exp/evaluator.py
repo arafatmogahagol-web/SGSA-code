@@ -25,8 +25,8 @@ def _fixed_stream(enabled):
 def evaluate(model, dataset, cfg, micro=None, save=None, method='clean'):
     """Mean absolute error, RMSE and MSE over valid labels only.
 
-    Errors are accumulated in float64 so the reported values do not depend on the
-    batch size or on the device.
+    Errors are accumulated in float64 to reduce summation error. Model predictions
+    can still vary with device, batching and nondeterministic kernels.
     """
     device = next(model.parameters()).device
     micro = int(micro or cfg['batch_size'])

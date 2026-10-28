@@ -2,7 +2,7 @@
 
 No experiment data, no GPU and no training are required:
 
-    python tools/test_integrity_guards.py
+    python -m unittest discover -s code/tests -v
 """
 import json
 import sys
@@ -13,8 +13,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-ROOT = Path(__file__).resolve().parents[1]
-CODE = ROOT / 'code'
+CODE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(CODE))
 
 from SGSA import SGSA
@@ -36,6 +35,12 @@ def _fake_data(split, timestamps=20000, nodes=2, features=1):
 
 
 class IntegrityGuards(unittest.TestCase):
+    def test_dataset_shuffle_defaults_are_preserved(self):
+        from exp.trainer import resolve_shuffle
+        self.assertFalse(resolve_shuffle(FROZEN['SDWPF']))
+        self.assertTrue(resolve_shuffle(FROZEN['Hill21']))
+        self.assertTrue(resolve_shuffle(FROZEN['SDWPF'], True))
+
     def test_window_origins_match_the_reported_counts(self):
         """The window helper reproduces the counts and origins stated in the paper."""
         data = _fake_data({'train': (0, 14000), 'val': (14000, 15000), 'test': (16000, 20000)})

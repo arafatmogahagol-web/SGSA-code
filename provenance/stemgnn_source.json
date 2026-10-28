@@ -1,7 +1,0 @@
-{
-  "repository": "https://github.com/microsoft/StemGNN",
-  "file": "models/base_model.py",
-  "sha256": "fa247c2036046091c6f68e27967ce45ace3e04ed16bbf2e957cc8df56374500a",
-  "raw_url": "https://raw.githubusercontent.com/microsoft/StemGNN/master/models/base_model.py",
-  "license_status": "No explicit LICENSE found in the inspected upstream root on2026-10-26; upstream source not redistributed in this repository."
-}

@@ -81,8 +81,6 @@ def prepare(args):
         elif not panel.exists():
             raise SystemExit(f'{panel} is missing; pass --zip /path/to/2020.zip')
     data = module(args.dataset).load(cfg, root)
-    if args.dataset == 'SDWPF':
-        pass
     valid = check_protocol(args.dataset, cfg, data)
     audit = priors_builder.build(cfg, data, root)
     print(json.dumps(dict(dataset=args.dataset, valid_test_points=valid,
@@ -214,8 +212,6 @@ def queue(args):
             for seed in cfg['seeds']:
                 for name in NAMES:
                     out = results / name / strategy / str(seed)
-                    if (out / 'complete.json').exists():
-                        continue
                     out.mkdir(parents=True, exist_ok=True)
                     dump(results / 'queue_status.json',
                          dict(dataset=args.dataset, stage='running', model=name,
@@ -254,7 +250,8 @@ def evaluate(args):
     device = _device(args.device)
     model = build(args.model, dict(cfg, dataset=args.dataset), device=str(device),
                   priors=load_priors(args.dataset, cfg)).to(device)
-    checkpoint_record = load_checkpoint(model, args.checkpoint)
+    checkpoint_record = load_checkpoint(
+        model, args.checkpoint, dataset_root(args.dataset) / 'checkpoint_metadata')
     severity = None if args.condition == 'clean' else 2
     dataset = windows(args.dataset, data, 'test', cfg, severity=severity,
                       seed=cfg['corruption_seed'])
@@ -274,6 +271,7 @@ def evaluate(args):
 
 # ------------------------------------------------------------------------- benchmark
 def benchmark(args):
+    _device('cuda')
     cfg, data = load(args.dataset)
     validate_protocol(args.dataset, cfg)
     rows = benchmark_module.benchmark(args.dataset, cfg, data, dirs_for(args.dataset),

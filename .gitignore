@@ -11,13 +11,12 @@ __pycache__/
 .env.*
 *.pem
 *.key
-*.p12
 id_rsa
 id_ed25519
 
-# datasets stay out of the repository; only configs and audit records are tracked
+# dataset payloads and generated audit records
 code/datasets/*/data/
-code/datasets/*/train_priors.npz
+code/datasets/*/*_audit.json
 
 # run artifacts
 code/checkpoints/*
@@ -27,4 +26,4 @@ code/results/*
 code/*.lock
 
 # third-party source fetched on demand (not redistributed)
-vendor/StemGNN/
+code/vendor/StemGNN/

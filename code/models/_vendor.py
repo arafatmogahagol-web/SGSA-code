@@ -1,15 +1,14 @@
 """Helpers for loading the unmodified third-party implementations in ``vendor/``.
 
-``vendor/`` sits next to ``code/`` and is never edited on disk: adapters either
-import it, or load a file after an explicit, asserted source replacement that is
-documented in ``docs/IMPLEMENTATION_NOTES.md``.
+``vendor/`` sits inside ``code/`` and is never edited on disk: adapters either
+import it, or load a file after an explicit, asserted source replacement.
 """
 import importlib.util
 import sys
 from pathlib import Path
 from types import ModuleType
 
-VENDOR = Path(__file__).resolve().parents[2] / 'vendor'
+VENDOR = Path(__file__).resolve().parents[1] / 'vendor'
 
 
 def module(name, path, package=False):
