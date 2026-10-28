@@ -3,24 +3,22 @@
 Hashes are computed on CRLF-to-LF normalized bytes, matching tools/verify_sources.py,
 so verification works across Windows and Linux checkouts.
 
-Excluded: the manifest itself, Git internals, caches, datasets, checkpoints, generated
-outputs and the separately fetched StemGNN source.
+Excluded: the manifest itself, Git internals, caches, dataset payloads, checkpoints,
+generated results and the separately fetched StemGNN source.
 """
-from pathlib import Path
-import argparse
 import hashlib
 import json
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / 'provenance' / 'packaged_hashes.json'
-SKIP_DIRS = {'.git', '__pycache__', '.venv', '.idea', '.vscode',
-             'runs', 'outputs', 'data'}
+SKIP_DIRS = {'.git', '__pycache__', '.venv', '.idea', '.vscode', 'checkpoints', 'results'}
 SKIP_SUFFIXES = {'.npz', '.pt', '.pth', '.zip', '.log', '.tmp', '.pyc'}
-SKIP_NAMES = {'status.json', 'queue.lock', 'train_priors.npz'}
+SKIP_NAMES = {'queue.lock', 'status.json', 'train_priors.npz', 'current_training.json'}
 # Regenerated with a timestamp by tools/smoke_checks.py; pinning its hash would make
 # verify_sources.py fail after every legitimate re-run of that check.
-SKIP_PATHS = {Path('provenance/packaged_hashes.json'), Path('vendor/StemGNN'),
-              Path('provenance/smoke_checks.json')}
+SKIP_PATHS = {Path('provenance/packaged_hashes.json'), Path('provenance/smoke_checks.json'),
+              Path('vendor/StemGNN')}
 
 
 def wanted(relative):
@@ -32,11 +30,14 @@ def wanted(relative):
         return False
     if relative.parts[:2] == ('vendor', 'StemGNN'):
         return False
+    # Dataset payloads stay out of the repository; configs and audit records are tracked.
+    if len(relative.parts) > 3 and relative.parts[:2] == ('code', 'datasets'):
+        if relative.parts[3] == 'data':
+            return False
     return True
 
 
 def main():
-    argparse.ArgumentParser(description=__doc__).parse_args()
     entries = {}
     for path in sorted(ROOT.rglob('*')):
         if not path.is_file():

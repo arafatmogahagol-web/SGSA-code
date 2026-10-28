@@ -1,0 +1,95 @@
+{
+  "dataset": "Hill21",
+  "protocol": "Hill of Towie, 21 turbines, January-March 2020, 30-minute bins",
+  "status": "final_rho025_frozen",
+  "training_authorized": true,
+  "model": "SGSA",
+  "num_nodes": 21,
+  "input_dim": 7,
+  "seq_len": 96,
+  "pred_len": 48,
+  "d_model": 64,
+  "graph_rank": 16,
+  "rho": 0.25,
+  "dropout": 0.1,
+  "batch_size": 32,
+  "micro_batch": 32,
+  "epochs": 50,
+  "patience": 8,
+  "learning_rate": 0.001,
+  "weight_decay": 0.0001,
+  "gradient_clip": 1.0,
+  "selection": "validation MAE",
+  "selection_key": "val_mae",
+  "metric_scale": "training-only z-score",
+  "strategies": [
+    "clean",
+    "noise"
+  ],
+  "seeds": [
+    2024,
+    2025,
+    2026
+  ],
+  "split": {
+    "train": [
+      0,
+      3058
+    ],
+    "val": [
+      3058,
+      3713
+    ],
+    "test": [
+      3713,
+      4369
+    ]
+  },
+  "train_stride": 4,
+  "evaluation_stride": 24,
+  "shuffle_each_epoch": true,
+  "eval_fixed_rng": false,
+  "augmentation_seed": 2024,
+  "validation_noise_seed": 502024,
+  "corruption_seed": 910024,
+  "expected_windows": {
+    "train": 729,
+    "val": 26,
+    "test": 26
+  },
+  "expected_valid_test_points": 26187,
+  "data": "data/panel.npz",
+  "priors": "train_priors.npz",
+  "audit": "data_audit.json",
+  "features": [
+    "wtc_AcWindSp_mean",
+    "wtc_GenRpm_mean",
+    "wtc_MainSRpm_mean",
+    "wtc_PitcPosA_mean",
+    "yaw_sin",
+    "yaw_cos",
+    "wtc_ActPower_mean"
+  ],
+  "raw": {
+    "period": "January-March 2020",
+    "source_doi": "10.5281/zenodo.14870023",
+    "months": [
+      1,
+      2,
+      3
+    ],
+    "train_ratio": 0.7,
+    "val_ratio": 0.15,
+    "availability_lag_minutes": 10
+  },
+  "benchmark": {
+    "warmup": 10,
+    "repeats": 30,
+    "batches": [
+      1,
+      32
+    ]
+  },
+  "hyperparameter_provenance": "Learning rate and dropout were selected from a six-candidate grid with seed 2024 by validation MAE (winner: learning_rate=0.001, dropout=0.1). The processed test period was inspected during development; it is a development evaluation panel, not an untouched confirmatory holdout. The reported runs then use this single frozen configuration for all methods and all three seeds.",
+  "development_panel_note": "See docs/DEVELOPMENT_HISTORY.md. No test labels are used as model inputs, and priors plus normalization statistics are fitted on the training range only."
+}

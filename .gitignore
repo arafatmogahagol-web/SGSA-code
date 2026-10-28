@@ -4,15 +4,9 @@ __pycache__/
 *.pt
 *.pth
 *.npz
+*.tmp
 *.zip
 .venv/
-experiments/*/data/
-experiments/*/runs/
-experiments/*/outputs/
-experiments/*/status.json
-experiments/*/queue.lock
-experiments/*/train_priors.npz
-vendor/StemGNN/
 .env
 .env.*
 *.pem
@@ -20,3 +14,17 @@ vendor/StemGNN/
 *.p12
 id_rsa
 id_ed25519
+
+# datasets stay out of the repository; only configs and audit records are tracked
+code/datasets/*/data/
+code/datasets/*/train_priors.npz
+
+# run artifacts
+code/checkpoints/*
+!code/checkpoints/.gitkeep
+code/results/*
+!code/results/.gitkeep
+code/*.lock
+
+# third-party source fetched on demand (not redistributed)
+vendor/StemGNN/

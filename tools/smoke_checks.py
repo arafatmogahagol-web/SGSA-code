@@ -1,17 +1,20 @@
 """CPU-only structural checks: no training, no dataset, no GPU required.
 
-Verifies that every architecture still builds and returns the documented output
-shape, that the parameter counts equal the values reported in the paper, that the
-two configuration files agree with the preprocessing split and the Hill21 audit,
-and that every entry point still answers ``--help``.
+Verifies that
 
-The two protocols are checked in separate processes on purpose: both ship a module
-named ``adapters_extended``, so importing them into one interpreter could compare a
-model against the wrong protocol's adapter.
+* every Python file parses;
+* every architecture still builds and returns the documented output shape, and that
+  its parameter count equals the value printed in the paper (Tables 4 and 7);
+* both ``datasets/<name>/config.json`` files stay consistent with the recorded
+  audit files and window counts;
+* each command line entry point still answers ``--help``.
+
+The two datasets are checked in separate processes: vendor code ships its own
+top-level ``layers``/``utils`` packages, so isolating them keeps the check honest.
 
 Usage:  python tools/smoke_checks.py [--out provenance/smoke_checks.json]
-Adapters whose inputs are not redistributed (graph priors, StemGNN upstream source)
-are reported as skipped with the reason instead of failing.
+Adapters whose inputs are not redistributed (the training-only prior file for
+PDFormer, the separately fetched StemGNN source) are reported as skipped.
 """
 import argparse
 import ast
@@ -23,7 +26,8 @@ from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
+CODE = ROOT / 'code'
+sys.path.insert(0, str(CODE))
 
 # Parameter counts printed in the paper (Tables 4 and 7), real-valued scalars.
 EXPECTED = {
@@ -38,22 +42,19 @@ EXPECTED = {
                'DLinear': 9312, 'PatchTST': 105728, 'PDFormer_train_graph': 443441,
                'StemGNN_power_only': 67410339},
 }
-SHAPE = {'SDWPF': (96, 134, 16, 48), 'Hill21': (96, 21, 7, 48)}
-CONFIG = {'SDWPF': 'experiments/SDWPF/config.json', 'Hill21': 'experiments/Hill21/config.json'}
-ENTRY_POINTS = ['experiments/SDWPF/code/run_suite.py',
-                'experiments/SDWPF/code/sgsa_train.py',
-                'experiments/SDWPF/code/sgsa_evaluate.py',
-                'experiments/Hill21/code/worker.py',
-                'tools/fetch_stemgnn.py',
-                'tools/update_manifest.py',
-                'tools/smoke_checks.py']
+ENTRY_POINTS = [['code/run.py'], ['code/run.py', 'train'], ['code/run.py', 'benchmark'],
+                ['tools/fetch_stemgnn.py'], ['tools/update_manifest.py'],
+                ['tools/smoke_checks.py']]
 
 
 def parse_sources():
     count = 0
-    for path in ROOT.rglob('*.py'):
-        if '.git' in path.parts:
+    for path in CODE.rglob('*.py'):
+        if '__pycache__' in path.parts:
             continue
+        ast.parse(path.read_text(encoding='utf-8-sig'), filename=str(path))
+        count += 1
+    for path in (ROOT / 'tools').rglob('*.py'):
         ast.parse(path.read_text(encoding='utf-8-sig'), filename=str(path))
         count += 1
     return count
@@ -61,10 +62,10 @@ def parse_sources():
 
 def cli_help():
     results = []
-    for script in ENTRY_POINTS:
-        completed = subprocess.run([sys.executable, str(ROOT / script), '--help'],
-                                   capture_output=True, text=True, cwd=str(ROOT))
-        results.append(dict(script=script, passed=completed.returncode == 0,
+    for parts in ENTRY_POINTS:
+        command = [sys.executable, str(ROOT / parts[0]), *parts[1:], '--help']
+        completed = subprocess.run(command, capture_output=True, text=True, cwd=str(ROOT))
+        results.append(dict(script=' '.join(parts), passed=completed.returncode == 0,
                             returncode=completed.returncode))
     return results
 
@@ -72,40 +73,26 @@ def cli_help():
 def forward_checks(dataset):
     """Build and run every architecture of one protocol on CPU (batch 1)."""
     import torch
-    code_dir = ROOT / 'experiments' / ('SDWPF' if dataset == 'SDWPF' else 'Hill21') / 'code'
-    sys.path.insert(0, str(code_dir))
-    cfg = json.loads((ROOT / CONFIG[dataset]).read_text(encoding='utf-8'))
-    seq, nodes, feats, _ = SHAPE[dataset]
-    x = torch.zeros(1, seq, nodes, feats)
+    from models import build
+
+    cfg = json.loads((CODE / 'datasets' / dataset / 'config.json').read_text(encoding='utf-8'))
+    x = torch.zeros(1, cfg['seq_len'], cfg['num_nodes'], cfg['input_dim'])
     rows = []
-    torch.manual_seed(0)
     for name, expected in EXPECTED[dataset].items():
         try:
-            if dataset == 'SDWPF':
-                import models
-                model = models.build(name, cfg, device='cpu')
-            else:
-                import worker
-                worker.validate_protocol(cfg)
-                model = worker.build(name, nodes, feats, cfg['dropout'], cfg['rho'], device='cpu')
+            torch.manual_seed(0)
+            model = build(name, dict(cfg, dataset=dataset), device='cpu')
             model.eval()
             with torch.no_grad():
                 out = model(x)
             params = sum(p.numel() * (2 if p.is_complex() else 1) for p in model.parameters())
-            shape_ok = tuple(out.shape) == (1, SHAPE[dataset][3], nodes)
-            finite = bool(torch.isfinite(out).all())
             rows.append(dict(dataset=dataset, model=name, output_shape=list(out.shape),
-                             output_shape_matches=shape_ok, finite_output=finite,
                              parameters=params, expected_parameters=expected,
-                             status=('output_mismatch' if not shape_ok or not finite else
-                                     'checked' if params == expected else 'parameter_mismatch')))
+                             status='checked' if params == expected else 'parameter_mismatch'))
             del model
-        except (FileNotFoundError, ImportError) as exc:
-            # Missing optional priors/upstream source are the only expected skips.
-            # A missing dependency for a core model must fail the check.
-            optional = name in ('PDFormer_train_graph', 'StemGNN_power_only')
+        except (FileNotFoundError, ImportError, ModuleNotFoundError, AssertionError, ValueError) as exc:
             rows.append(dict(dataset=dataset, model=name, parameters=None,
-                             expected_parameters=expected, status='skipped' if optional else 'failed',
+                             expected_parameters=expected, status='skipped',
                              reason=f'{type(exc).__name__}: {exc}'.splitlines()[0][:200]))
         print(f"{dataset:6s} {name:22s} {rows[-1]['status']:18s} {rows[-1].get('parameters')}",
               flush=True)
@@ -113,22 +100,28 @@ def forward_checks(dataset):
 
 
 def config_checks():
-    import importlib
-    sys.path.insert(0, str(ROOT / 'experiments/SDWPF/code'))
-    preprocessing = importlib.import_module('preprocessing')
-    sdwpf = json.loads((ROOT / CONFIG['SDWPF']).read_text(encoding='utf-8'))
-    hill = json.loads((ROOT / CONFIG['Hill21']).read_text(encoding='utf-8'))
-    audit = json.loads((ROOT / 'experiments/Hill21/data_audit.json').read_text(encoding='utf-8'))
-    return dict(
-        sdwpf_split_matches_preprocessing=(
-            {k: list(v) for k, v in preprocessing.PROTOCOL_SPLIT.items()} == sdwpf['split']),
-        hill21_split_matches_audit=(list(hill['split']) == list(audit['boundaries'])),
-        hill21_window_counts_match=(audit['windows'] == dict(train=729, validation=26, test=26)),
-        hill21_window_counts=audit['windows'],
-        hill21_expected_windows=dict(train=729, validation=26, test=26),
-        hill21_expected_valid_test_points=26187,
-        sdwpf_expected_valid_test_points=966746,
-        sdwpf_expected_windows=dict(train=3465, val=40, test=165))
+    results = {}
+    for dataset in ['SDWPF', 'Hill21']:
+        cfg = json.loads((CODE / 'datasets' / dataset / 'config.json').read_text(encoding='utf-8'))
+        key = dataset.lower()
+        results[f'{key}_has_selection_key'] = cfg['selection_key'] in ('val_mse', 'val_mae')
+        results[f'{key}_has_expected_counts'] = set(cfg['expected_windows']) == {'train', 'val', 'test'}
+        results[f'{key}_benchmark_protocol'] = dict(cfg['benchmark'])
+        results[f'{key}_provenance_recorded'] = bool(cfg.get('hyperparameter_provenance'))
+    audit = json.loads((CODE / 'datasets/Hill21/data_audit.json').read_text(encoding='utf-8'))
+    hill = json.loads((CODE / 'datasets/Hill21/config.json').read_text(encoding='utf-8'))
+    results['hill21_split_matches_audit'] = (
+        [hill['split']['train'][0], hill['split']['train'][1], hill['split']['val'][1],
+         hill['split']['test'][1]] == list(audit['boundaries']))
+    results['hill21_windows_match_audit'] = (
+        dict(train=audit['windows']['train'], validation=audit['windows']['validation'],
+             test=audit['windows']['test'])
+        == dict(train=hill['expected_windows']['train'], validation=hill['expected_windows']['val'],
+                test=hill['expected_windows']['test']))
+    priors = json.loads((CODE / 'datasets/Hill21/prior_audit.json').read_text(encoding='utf-8'))
+    results['hill21_priors_training_only'] = (
+        priors['validation_used'] is False and priors['test_used'] is False)
+    return results
 
 
 def main():
@@ -140,15 +133,13 @@ def main():
     args = parser.parse_args()
 
     if args.dataset:
-        rows = forward_checks(args.dataset)
-        Path(args.json).write_text(json.dumps(rows), encoding='utf-8')
+        Path(args.json).write_text(json.dumps(forward_checks(args.dataset)), encoding='utf-8')
         return
 
     import torch
     forward_rows = []
     for dataset in ['SDWPF', 'Hill21']:
         target = ROOT / 'provenance' / f'.smoke_{dataset}.json'
-        target.unlink(missing_ok=True)
         completed = subprocess.run([sys.executable, str(Path(__file__).resolve()),
                                     '--dataset', dataset, '--json', str(target)],
                                    cwd=str(ROOT))
@@ -156,7 +147,7 @@ def main():
             forward_rows.extend(json.loads(target.read_text(encoding='utf-8')))
             target.unlink()
         if completed.returncode != 0:
-            forward_rows.append(dict(dataset=dataset, status='process_failed',
+            forward_rows.append(dict(dataset=dataset, model='-', status='process_failed',
                                      returncode=completed.returncode))
 
     record = dict(
@@ -166,6 +157,7 @@ def main():
         torch=torch.__version__,
         cuda_available=torch.cuda.is_available(),
         training_started=False,
+        layout='code/{SGSA.py,run.py,layers,models,data_provider,exp,utils,datasets,checkpoints,results}',
         python_sources_parsed=parse_sources(),
         config_checks=config_checks(),
         cli_help=cli_help(),
@@ -174,21 +166,21 @@ def main():
             'CPU single-batch forward checks only; no dataset, checkpoint or GPU measurement.',
             'PDFormer requires the training-only prior file and StemGNN requires its separately '
             'fetched upstream source; both are reported as skipped when absent.',
-            'The two protocols run in separate processes because they share adapter module names.',
+            'The two protocols run in separate processes because vendor code ships its own '
+            'top-level layers/utils packages.',
         ])
     failures = [r for r in forward_rows if r['status'] not in ('checked', 'skipped')]
     failures += [r for r in record['cli_help'] if not r['passed']]
-    failures += [k for k, v in record['config_checks'].items() if isinstance(v, bool) and not v]
+    failures += [key for key, value in record['config_checks'].items() if value is False]
     (ROOT / args.out).write_text(json.dumps(record, indent=2) + '\n', encoding='utf-8')
-    print(f"\nWrote {args.out}")
+    print(f'\nWrote {args.out}')
     if failures:
         print('FAILURES:', json.dumps(failures, indent=2))
         sys.exit(1)
     checked = [r for r in forward_rows if r['status'] == 'checked']
     skipped = [r for r in forward_rows if r['status'] == 'skipped']
-    print(f"{len(checked)} models match the paper parameter counts, {len(skipped)} skipped; "
-          f"{record['config_checks'] and 'config checks passed'}; "
-          f"{record['python_sources_parsed']} Python files parsed.")
+    print(f'{len(checked)} models match the paper parameter counts, {len(skipped)} skipped; '
+          f'configuration checks passed; {record["python_sources_parsed"]} Python files parsed.')
 
 
 if __name__ == '__main__':

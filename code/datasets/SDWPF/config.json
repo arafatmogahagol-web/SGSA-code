@@ -1,0 +1,76 @@
+{
+  "dataset": "SDWPF",
+  "protocol": "134-turbine SDWPF array, processed 30-minute cache",
+  "status": "final_rho025_frozen",
+  "training_authorized": true,
+  "model": "SGSA",
+  "num_nodes": 134,
+  "input_dim": 16,
+  "seq_len": 96,
+  "pred_len": 48,
+  "d_model": 64,
+  "graph_rank": 16,
+  "rho": 0.25,
+  "dropout": 0.1,
+  "batch_size": 32,
+  "micro_batch": null,
+  "epochs": 30,
+  "patience": 5,
+  "learning_rate": 0.0005,
+  "weight_decay": 0.0001,
+  "gradient_clip": 1.0,
+  "selection": "validation MSE",
+  "selection_key": "val_mse",
+  "metric_scale": "training-only z-score",
+  "strategies": [
+    "clean",
+    "noise"
+  ],
+  "seeds": [
+    2024,
+    2025,
+    2026
+  ],
+  "split": {
+    "train": [
+      0,
+      14000
+    ],
+    "val": [
+      14000,
+      15000
+    ],
+    "unused": [
+      15000,
+      16000
+    ],
+    "test": [
+      16000,
+      20000
+    ]
+  },
+  "train_stride": 4,
+  "evaluation_stride": 24,
+  "shuffle_each_epoch": false,
+  "eval_fixed_rng": true,
+  "augmentation_seed": 2024,
+  "validation_noise_seed": 502024,
+  "corruption_seed": 910024,
+  "expected_windows": {
+    "train": 3465,
+    "val": 40,
+    "test": 165
+  },
+  "expected_valid_test_points": 966746,
+  "data": "data/data_20000.npz",
+  "priors": "train_priors.npz",
+  "benchmark": {
+    "warmup": 20,
+    "repeats": 100,
+    "batches": [
+      32
+    ]
+  },
+  "hyperparameter_provenance": "Every reported run uses this single frozen configuration. The residual coefficient rho was compared at 0.5 and 0.25 on the processed test panel during development before being fixed at 0.25; the rho=0.5 runs are archived and are not reported. No further per-model test-driven tuning was applied.",
+  "development_panel_note": "The test period [16000,20000) was inspected during development. It is a development evaluation panel, not an untouched confirmatory holdout; this repository does not claim otherwise."
+}

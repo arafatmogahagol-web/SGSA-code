@@ -6,27 +6,71 @@ positional encoding, temporal SimAM weighting, and a shared direct prediction he
 History=96, horizon=48, hidden width=64, graph rank=16. Each dataset is trained
 separately.
 
-The proposed model has a single implementation, `sgsa_utils/model.py`. The module names
-that earlier scripts used (`sgsa.py`, `model.py`, `sgsa_layers.py`, `layers.py`,
-`sgsa_model.py`) are thin re-export shims, so the two protocols cannot diverge.
+The proposed model has a single implementation, `code/SGSA.py`. One framework serves both
+datasets: shapes and training settings come from `code/datasets/<name>/config.json`, so
+no dataset constant is hard-coded in the model, the data pipeline or the trainer.
 
-## Repository layout
-- `experiments/SDWPF/`: 134 turbines, 16 variables; configuration and all benchmark adapters.
-- `experiments/Hill21/`: Hill of Towie, 21 turbines, 7 variables; January–March 2020.
-- `sgsa_utils/model.py`: the SGSA architecture, temporal SimAM, historical checkpoint loader.
-- `sgsa_utils/checkpoints.py`: strict checkpoint loading and hash-bound Fourier-index metadata.
-- `docs/PAPER_CODE_MAPPING.md`: every paper claim mapped to the file that implements it.
-- `docs/DATA_PROTOCOLS.md`: the two protocols and their differences.
-- `docs/IMPLEMENTATION_NOTES.md`: baseline adaptations and reporting conventions.
-- `docs/DEVELOPMENT_HISTORY.md`: prior exploratory use of the evaluation panels.
-- `docs/EXPERIMENT_REVIEW_20261028.md`: manuscript comparison, repairs and remaining limitations.
-- `vendor/`: licensed third-party implementations with their original notices.
+## Layout
+
+```
+code/
+├── SGSA.py                 proposed model (static graph + scaled residual + SimAM head)
+├── run.py                  single entry point: prepare / preflight / train / queue /
+│                           evaluate / benchmark / report
+├── layers/simam.py         parameter-free temporal attention (paper Eq. 4)
+├── models/                 13 compared architectures, one registry (models/__init__.py)
+│   ├── multigsa.py         MultiGSA_adapted (structural adaptation)
+│   ├── temporal.py         LSTM, Transformer (weights shared across turbines)
+│   ├── mtgnn.py            MTGNN
+│   ├── fedformer.py        FEDformer
+│   ├── extended.py         GraphWaveNet, AGCRN, STID, DLinear, PatchTST
+│   └── extra.py            PDFormer, StemGNN
+├── data_provider/          per-dataset preprocessing + windows + corruption
+│   ├── common.py           prepared-data container, window slicing, corruption levels
+│   ├── sdwpf.py            SDWPF cache loader (134 turbines, 16 variables)
+│   ├── hill21.py           Hill of Towie raw-to-panel builder (21 turbines, 7 variables)
+│   └── priors.py           training-only graph/DTW/pattern priors
+├── exp/                    trainer, evaluator, inference-cost benchmark, reporter
+├── utils/                  checkpoint IO, seeding, plotting, parameter counting
+├── datasets/
+│   ├── SDWPF/              config.json + data/, train_priors.npz (both untracked)
+│   └── Hill21/             config.json + data audit + FEDformer recovery records
+├── checkpoints/            trained weights, ignored by Git
+└── results/                metrics, tables and figures, ignored by Git
+```
+
+Every dataset keeps its own folder: `code/datasets/SDWPF` and `code/datasets/Hill21` each
+hold the configuration, the audit record and the (untracked) data cache.
 
 ## Installation
 Use a separate Python environment. GPU training uses NVIDIA CUDA; install a matching
 PyTorch build, then run `pip install -r requirements.txt`. The original measurements used
-an RTX 3080 Ti. Consult `docs/DATA_PROTOCOLS.md` for the different dataset protocols.
-CPU execution supports frozen evaluation and the integrity checks only.
+an RTX 3080 Ti. CPU execution supports frozen evaluation and the integrity checks only.
+
+## Usage
+
+```sh
+# 0) data: see below, then build the training-only priors
+python code/run.py prepare   --dataset Hill21 --zip /path/to/2020.zip
+python code/run.py prepare   --dataset SDWPF
+
+# 1) verify the protocol counts and pick a feasible microbatch
+python code/run.py preflight --dataset SDWPF
+
+# 2) one run, or the full grid (13 models x 2 strategies x 3 seeds)
+python code/run.py train     --dataset SDWPF --model SGSA --strategy clean --seed 2024
+python code/run.py queue     --dataset SDWPF
+
+# 3) score a checkpoint, or re-measure parameters / latency / peak memory
+python code/run.py evaluate  --dataset Hill21 --model SGSA --checkpoint best.pt --device cpu
+python code/run.py benchmark --dataset SDWPF
+
+# 4) aggregate everything that finished
+python code/run.py report    --dataset SDWPF
+```
+
+All commands read `code/datasets/<name>/config.json`; `preflight` fails if the prepared
+data, the window counts or the valid-label count disagree with it.
 
 ## Data preparation
 Raw data and checkpoints are distributed separately from source code.
@@ -34,77 +78,52 @@ Raw data and checkpoints are distributed separately from source code.
 **Hill of Towie:** obtain the 2020 archive from https://doi.org/10.5281/zenodo.14870023 .
 The six monthly CSVs used here are `tblSCTurbine` and `tblSCTurGrid` for January–March
 2020. They may remain in the full-year ZIP or in a ZIP containing only those six files.
-
-```sh
-python experiments/Hill21/code/prepare_data.py /path/to/2020.zip
-python experiments/Hill21/code/prepare_priors.py
-python experiments/Hill21/code/worker.py SGSA
-```
-
-The worker uses fixed settings from `experiments/Hill21/config.json`, three seeds and
-clean/noise training. No hyperparameter search runs as part of preprocessing or the
-worker. Substitute another model name, including `FEDformer`, to run that benchmark. To
-evaluate existing checkpoints without training:
-
-```sh
-python experiments/Hill21/code/worker.py FEDformer --evaluate-only --device cpu
-```
-
-Place checkpoints and their run files under
-`experiments/Hill21/runs/<model>/<clean|noise>/<seed>/`. New checkpoints include
-`best.pt.metadata.json`. Six original FEDformer checkpoints can also load with the supplied
-SHA256-matched records in `checkpoint_metadata/`.
+`run.py prepare` writes `code/datasets/Hill21/data/panel.npz` plus `data_audit.json` and
+the training-only priors.
 
 **SDWPF:** source https://doi.org/10.1038/s41597-024-03427-5 . Place the audited processed
-cache at `experiments/SDWPF/data/data_20000.npz`. The release identifies its hash and
-protocol; it does not substitute an unverified raw-to-cache recipe. Then:
+cache at `code/datasets/SDWPF/data/data_20000.npz`. The release identifies its hash and
+protocol; it does not substitute an unverified raw-to-cache recipe. `run.py prepare` then
+builds the training-only priors.
 
-```sh
-python experiments/SDWPF/code/prepare_priors.py
-python experiments/SDWPF/code/run_suite.py preflight
-python experiments/SDWPF/code/run_suite.py train --model SGSA --strategy clean --seed 2024
-python experiments/SDWPF/code/run_suite.py queue          # 13 models x 2 strategies x 3 seeds
-python experiments/SDWPF/code/run_suite.py benchmark --model SGSA   # paper Table 4 protocol
-```
-
-Preflight discovers a feasible microbatch while preserving 32 windows per optimizer step
-through gradient accumulation, and refuses to continue if the window counts or the
-configuration disagree with the frozen protocol. The queue covers 13 methods and 78
-training runs. Extended model adapters retain their documented differences from the
-original papers. For StemGNN only, first run `python tools/fetch_stemgnn.py`; its upstream
-source is fetched locally and is not redistributed here.
+Checkpoints are written to `code/checkpoints/<dataset>/<model>/<strategy>/<seed>/best.pt`
+with a `best.pt.metadata.json` sidecar that binds the weight hash to FEDformer's frequency
+index lists. The six original Hill21 recovery records stay in
+`code/datasets/Hill21/checkpoint_metadata/`. Extended model adapters retain their
+documented differences from the original papers. For StemGNN only, first run
+`python tools/fetch_stemgnn.py`; its upstream source is fetched locally and is not
+redistributed here.
 
 ## Verification without training
 ```sh
 python tools/verify_sources.py     # packaged file hashes + Python syntax
 python tools/smoke_checks.py       # CPU forward checks, parameter counts vs the paper
-python tools/test_integrity_guards.py  # checkpoint rho, run reuse and window origins
 ```
 `verify_sources.py` checks the packaged hashes and parses every Python file without
 importing models or starting training. `smoke_checks.py` builds every architecture on CPU,
-compares the parameter counts with the values printed in Tables 4 and 7, confirms that both
-`config.json` files match the recorded splits, and calls `--help` on each entry point; it
-writes `provenance/smoke_checks.json`. Four adapters need inputs that are not
-redistributed (the training-only prior file for PDFormer and the separately fetched StemGNN
-source) and are reported as skipped. After an intentional source edit, regenerate the hash
-manifest with `python tools/update_manifest.py`.
+compares the parameter counts with the values printed in Tables 4 and 7, cross-checks both
+dataset configurations against their audit records, and pings each entry point; it writes
+`provenance/smoke_checks.json`. Four adapters need inputs that are not redistributed (the
+training-only prior file for PDFormer and the separately fetched StemGNN source) and are
+reported as skipped. After an intentional source edit, regenerate the hash manifest with
+`python tools/update_manifest.py`.
 
 ## Disclosures
-Both evaluation panels were inspected during development, and both configuration files
+Both evaluation panels were inspected during development, and both dataset configurations
 record how the hyperparameters were chosen:
 
-- `experiments/SDWPF/config.json`: `rho` was compared at 0.5 and 0.25 on the development
+- `code/datasets/SDWPF/config.json`: `rho` was compared at 0.5 and 0.25 on the development
   test panel before being fixed at 0.25; the 0.5 runs are archived and are not reported.
   The test period `[16000,20000)` is a development evaluation panel, not an untouched
   confirmatory holdout.
-- `experiments/Hill21/config.json`: the learning rate and dropout were selected from a
+- `code/datasets/Hill21/config.json`: the learning rate and dropout were selected from a
   six-candidate grid with seed 2024 by validation MAE; the processed test period was also
   inspected during development.
 - All reported metrics are on the training-only z-score scale, not in kW.
 - `MultiGSA_adapted` is a documented structural adaptation, not a reproduction of the
   original paper's configuration.
-- The released SDWPF runs use a fixed batch order on every epoch; see
-  `docs/DATA_PROTOCOLS.md`.
+- The released SDWPF runs used a fixed batch order on every epoch
+  (`shuffle_each_epoch=false` in the configuration); Hill21 reshuffles every epoch.
 
 ## Reproducibility
 See `REPRODUCIBILITY.md` and `docs/PAPER_CODE_MAPPING.md`. Both experiments use

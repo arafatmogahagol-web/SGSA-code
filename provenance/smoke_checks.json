@@ -1,51 +1,51 @@
 {
-  "generated": "2026-10-28T18:09:54",
+  "generated": "2026-10-28T18:47:06",
   "platform": "Windows-11-10.0.26200-SP0",
   "python": "3.12.4",
   "torch": "2.6.0+cu124",
   "cuda_available": false,
   "training_started": false,
-  "python_sources_parsed": 327,
+  "layout": "code/{SGSA.py,run.py,layers,models,data_provider,exp,utils,datasets,checkpoints,results}",
+  "python_sources_parsed": 33,
   "config_checks": {
-    "sdwpf_split_matches_preprocessing": true,
+    "sdwpf_has_selection_key": true,
+    "sdwpf_has_expected_counts": true,
+    "sdwpf_benchmark_protocol": {
+      "warmup": 20,
+      "repeats": 100,
+      "batches": [
+        32
+      ]
+    },
+    "sdwpf_provenance_recorded": true,
+    "hill21_has_selection_key": true,
+    "hill21_has_expected_counts": true,
+    "hill21_benchmark_protocol": {
+      "warmup": 10,
+      "repeats": 30,
+      "batches": [
+        1,
+        32
+      ]
+    },
+    "hill21_provenance_recorded": true,
     "hill21_split_matches_audit": true,
-    "hill21_window_counts_match": true,
-    "hill21_window_counts": {
-      "train": 729,
-      "validation": 26,
-      "test": 26
-    },
-    "hill21_expected_windows": {
-      "train": 729,
-      "validation": 26,
-      "test": 26
-    },
-    "hill21_expected_valid_test_points": 26187,
-    "sdwpf_expected_valid_test_points": 966746,
-    "sdwpf_expected_windows": {
-      "train": 3465,
-      "val": 40,
-      "test": 165
-    }
+    "hill21_windows_match_audit": true,
+    "hill21_priors_training_only": true
   },
   "cli_help": [
     {
-      "script": "experiments/SDWPF/code/run_suite.py",
+      "script": "code/run.py",
       "passed": true,
       "returncode": 0
     },
     {
-      "script": "experiments/SDWPF/code/sgsa_train.py",
+      "script": "code/run.py train",
       "passed": true,
       "returncode": 0
     },
     {
-      "script": "experiments/SDWPF/code/sgsa_evaluate.py",
-      "passed": true,
-      "returncode": 0
-    },
-    {
-      "script": "experiments/Hill21/code/worker.py",
+      "script": "code/run.py benchmark",
       "passed": true,
       "returncode": 0
     },
@@ -74,8 +74,6 @@
         48,
         134
       ],
-      "output_shape_matches": true,
-      "finite_output": true,
       "parameters": 23216,
       "expected_parameters": 23216,
       "status": "checked"
@@ -88,8 +86,6 @@
         48,
         134
       ],
-      "output_shape_matches": true,
-      "finite_output": true,
       "parameters": 34033,
       "expected_parameters": 34033,
       "status": "checked"
@@ -102,8 +98,6 @@
         48,
         134
       ],
-      "output_shape_matches": true,
-      "finite_output": true,
       "parameters": 75056,
       "expected_parameters": 75056,
       "status": "checked"
@@ -116,8 +110,6 @@
         48,
         134
       ],
-      "output_shape_matches": true,
-      "finite_output": true,
       "parameters": 81584,
       "expected_parameters": 81584,
       "status": "checked"
@@ -130,8 +122,6 @@
         48,
         134
       ],
-      "output_shape_matches": true,
-      "finite_output": true,
       "parameters": 5264032,
       "expected_parameters": 5264032,
       "status": "checked"
@@ -144,8 +134,6 @@
         48,
         134
       ],
-      "output_shape_matches": true,
-      "finite_output": true,
       "parameters": 225040,
       "expected_parameters": 225040,
       "status": "checked"
@@ -158,8 +146,6 @@
         48,
         134
       ],
-      "output_shape_matches": true,
-      "finite_output": true,
       "parameters": 764520,
       "expected_parameters": 764520,
       "status": "checked"
@@ -172,8 +158,6 @@
         48,
         134
       ],
-      "output_shape_matches": true,
-      "finite_output": true,
       "parameters": 807020,
       "expected_parameters": 807020,
       "status": "checked"
@@ -186,8 +170,6 @@
         48,
         134
       ],
-      "output_shape_matches": true,
-      "finite_output": true,
       "parameters": 163184,
       "expected_parameters": 163184,
       "status": "checked"
@@ -200,8 +182,6 @@
         48,
         134
       ],
-      "output_shape_matches": true,
-      "finite_output": true,
       "parameters": 9312,
       "expected_parameters": 9312,
       "status": "checked"
@@ -214,8 +194,6 @@
         48,
         134
       ],
-      "output_shape_matches": true,
-      "finite_output": true,
       "parameters": 105746,
       "expected_parameters": 105746,
       "status": "checked"
@@ -226,7 +204,7 @@
       "parameters": null,
       "expected_parameters": 444017,
       "status": "skipped",
-      "reason": "FileNotFoundError: [Errno 2] No such file or directory: 'D:\\\\SGSA_Paper\\\\final paper\\\\code\\\\experiments\\\\SDWPF\\\\train_priors.npz'"
+      "reason": "ValueError: PDFormer needs the training-only prior file (run `python run.py prepare --dataset <name>`)"
     },
     {
       "dataset": "SDWPF",
@@ -244,8 +222,6 @@
         48,
         21
       ],
-      "output_shape_matches": true,
-      "finite_output": true,
       "parameters": 19024,
       "expected_parameters": 19024,
       "status": "checked"
@@ -258,8 +234,6 @@
         48,
         21
       ],
-      "output_shape_matches": true,
-      "finite_output": true,
       "parameters": 29841,
       "expected_parameters": 29841,
       "status": "checked"
@@ -272,8 +246,6 @@
         48,
         21
       ],
-      "output_shape_matches": true,
-      "finite_output": true,
       "parameters": 74480,
       "expected_parameters": 74480,
       "status": "checked"
@@ -286,8 +258,6 @@
         48,
         21
       ],
-      "output_shape_matches": true,
-      "finite_output": true,
       "parameters": 81008,
       "expected_parameters": 81008,
       "status": "checked"
@@ -300,8 +270,6 @@
         48,
         21
       ],
-      "output_shape_matches": true,
-      "finite_output": true,
       "parameters": 1988112,
       "expected_parameters": 1988112,
       "status": "checked"
@@ -314,8 +282,6 @@
         48,
         21
       ],
-      "output_shape_matches": true,
-      "finite_output": true,
       "parameters": 219271,
       "expected_parameters": 219271,
       "status": "checked"
@@ -328,8 +294,6 @@
         48,
         21
       ],
-      "output_shape_matches": true,
-      "finite_output": true,
       "parameters": 761684,
       "expected_parameters": 761684,
       "status": "checked"
@@ -342,8 +306,6 @@
         48,
         21
       ],
-      "output_shape_matches": true,
-      "finite_output": true,
       "parameters": 771330,
       "expected_parameters": 771330,
       "status": "checked"
@@ -356,8 +318,6 @@
         48,
         21
       ],
-      "output_shape_matches": true,
-      "finite_output": true,
       "parameters": 104272,
       "expected_parameters": 104272,
       "status": "checked"
@@ -370,8 +330,6 @@
         48,
         21
       ],
-      "output_shape_matches": true,
-      "finite_output": true,
       "parameters": 9312,
       "expected_parameters": 9312,
       "status": "checked"
@@ -384,8 +342,6 @@
         48,
         21
       ],
-      "output_shape_matches": true,
-      "finite_output": true,
       "parameters": 105728,
       "expected_parameters": 105728,
       "status": "checked"
@@ -396,7 +352,7 @@
       "parameters": null,
       "expected_parameters": 443441,
       "status": "skipped",
-      "reason": "FileNotFoundError: [Errno 2] No such file or directory: 'D:\\\\SGSA_Paper\\\\final paper\\\\code\\\\experiments\\\\Hill21\\\\train_priors.npz'"
+      "reason": "ValueError: PDFormer needs the training-only prior file (run `python run.py prepare --dataset <name>`)"
     },
     {
       "dataset": "Hill21",
@@ -410,6 +366,6 @@
   "limitations": [
     "CPU single-batch forward checks only; no dataset, checkpoint or GPU measurement.",
     "PDFormer requires the training-only prior file and StemGNN requires its separately fetched upstream source; both are reported as skipped when absent.",
-    "The two protocols run in separate processes because they share adapter module names."
+    "The two protocols run in separate processes because vendor code ships its own top-level layers/utils packages."
   ]
 }
