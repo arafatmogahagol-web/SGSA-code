@@ -32,6 +32,7 @@ from data_provider import priors as priors_builder
 from data_provider.common import loader
 from exp import benchmark as benchmark_module
 from exp import evaluator, reporter, trainer
+from exp.guards import check_device, validate_protocol
 from models import NAMES, build
 from utils.checkpoints import load_checkpoint
 from utils.io import dump, sha256
@@ -46,7 +47,8 @@ def dirs_for(dataset):
 
 
 def check_protocol(dataset, cfg, data):
-    """Fail loudly if the prepared data disagrees with the configured protocol."""
+    """Fail loudly if the configuration or the prepared data drifted from the paper."""
+    validate_protocol(dataset, cfg)
     for partition in ('train', 'val', 'test'):
         expected = cfg['expected_windows'][partition]
         actual = len(data.window_starts[partition])
@@ -70,6 +72,7 @@ def source_hashes():
 # --------------------------------------------------------------------------- prepare
 def prepare(args):
     cfg = load_config(args.dataset)
+    validate_protocol(args.dataset, cfg)
     root = dataset_root(args.dataset)
     if args.dataset == 'Hill21':
         panel = root / cfg['data']
@@ -149,6 +152,7 @@ def preflight(args):
 # ----------------------------------------------------------------------------- train
 def train(args):
     cfg, data = load(args.dataset)
+    validate_protocol(args.dataset, cfg)
     dirs = dirs_for(args.dataset)
     micro = args.micro
     if micro is None:
@@ -194,6 +198,7 @@ def _acquire_lock(path):
 
 def queue(args):
     cfg = load_config(args.dataset)
+    validate_protocol(args.dataset, cfg)
     dirs = dirs_for(args.dataset)
     results = Path(dirs['results'])
     results.mkdir(parents=True, exist_ok=True)
@@ -245,10 +250,11 @@ def queue(args):
 # -------------------------------------------------------------------------- evaluate
 def evaluate(args):
     cfg, data = load(args.dataset)
+    validate_protocol(args.dataset, cfg)
     device = _device(args.device)
     model = build(args.model, dict(cfg, dataset=args.dataset), device=str(device),
                   priors=load_priors(args.dataset, cfg)).to(device)
-    load_checkpoint(model, args.checkpoint)
+    checkpoint_record = load_checkpoint(model, args.checkpoint)
     severity = None if args.condition == 'clean' else 2
     dataset = windows(args.dataset, data, 'test', cfg, severity=severity,
                       seed=cfg['corruption_seed'])
@@ -257,14 +263,19 @@ def evaluate(args):
     out.mkdir(parents=True, exist_ok=True)
     metrics = evaluator.evaluate(model, dataset, cfg, save=out / 'predictions',
                                  method=args.condition)[0]
+    if metrics['valid_points'] != cfg['expected_valid_test_points']:
+        raise SystemExit(f'Valid test point drift: {metrics["valid_points"]} != '
+                         f'{cfg["expected_valid_test_points"]}')
     dump(out / 'metrics.json', dict(dataset=args.dataset, model=args.model,
-                                    condition=args.condition, **metrics))
+                                    condition=args.condition, **metrics,
+                                    checkpoint=checkpoint_record))
     print(json.dumps(metrics, indent=2))
 
 
 # ------------------------------------------------------------------------- benchmark
 def benchmark(args):
     cfg, data = load(args.dataset)
+    validate_protocol(args.dataset, cfg)
     rows = benchmark_module.benchmark(args.dataset, cfg, data, dirs_for(args.dataset),
                                       model_names=args.models, warmup=args.warmup,
                                       repeats=args.repeats, batches=args.batch,
@@ -284,15 +295,7 @@ def report(args):
 
 
 def _device(name):
-    if name == 'cpu':
-        return torch.device('cpu')
-    if not torch.cuda.is_available():
-        raise SystemExit('CUDA is unavailable; use --device cpu for frozen inference')
-    torch.set_num_threads(4)
-    torch.backends.cuda.matmul.allow_tf32 = False
-    torch.backends.cudnn.allow_tf32 = False
-    torch.backends.cudnn.benchmark = False
-    return torch.device('cuda')
+    return check_device(name)
 
 
 def main():

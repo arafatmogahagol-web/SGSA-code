@@ -70,11 +70,26 @@ def cli_help():
     return results
 
 
+def integrity_guards():
+    """Run the CPU regression tests for checkpoint/run identity."""
+    completed = subprocess.run([sys.executable, str(ROOT / 'tools/test_integrity_guards.py')],
+                               capture_output=True, text=True, cwd=str(ROOT))
+    tail = [line for line in completed.stderr.strip().splitlines() if line.strip()][-1:]
+    return dict(script='tools/test_integrity_guards.py', passed=completed.returncode == 0,
+                summary=tail[0].strip() if tail else '')
+
+
 def forward_checks(dataset):
-    """Build and run every architecture of one protocol on CPU (batch 1)."""
+    """Build and run every architecture of one protocol on CPU (batch 1).
+
+    Only PDFormer and StemGNN may be skipped: their inputs (the training-only prior
+    file and the separately fetched upstream source) are not redistributed. A
+    missing library or any other failure is reported as a failure, never as a skip.
+    """
     import torch
     from models import build
 
+    optional = {'PDFormer_train_graph', 'StemGNN_power_only'}
     cfg = json.loads((CODE / 'datasets' / dataset / 'config.json').read_text(encoding='utf-8'))
     x = torch.zeros(1, cfg['seq_len'], cfg['num_nodes'], cfg['input_dim'])
     rows = []
@@ -85,14 +100,19 @@ def forward_checks(dataset):
             model.eval()
             with torch.no_grad():
                 out = model(x)
+            if not torch.isfinite(out).all():
+                raise AssertionError('nonfinite output')
+            if list(out.shape) != [1, cfg['pred_len'], cfg['num_nodes']]:
+                raise AssertionError(f'unexpected output shape {tuple(out.shape)}')
             params = sum(p.numel() * (2 if p.is_complex() else 1) for p in model.parameters())
             rows.append(dict(dataset=dataset, model=name, output_shape=list(out.shape),
                              parameters=params, expected_parameters=expected,
                              status='checked' if params == expected else 'parameter_mismatch'))
             del model
-        except (FileNotFoundError, ImportError, ModuleNotFoundError, AssertionError, ValueError) as exc:
+        except Exception as exc:  # noqa: BLE001 - reported, not swallowed
+            status = 'skipped' if name in optional else 'failed'
             rows.append(dict(dataset=dataset, model=name, parameters=None,
-                             expected_parameters=expected, status='skipped',
+                             expected_parameters=expected, status=status,
                              reason=f'{type(exc).__name__}: {exc}'.splitlines()[0][:200]))
         print(f"{dataset:6s} {name:22s} {rows[-1]['status']:18s} {rows[-1].get('parameters')}",
               flush=True)
@@ -161,6 +181,7 @@ def main():
         python_sources_parsed=parse_sources(),
         config_checks=config_checks(),
         cli_help=cli_help(),
+        integrity_guards=integrity_guards(),
         model_forward_checks=forward_rows,
         limitations=[
             'CPU single-batch forward checks only; no dataset, checkpoint or GPU measurement.',
@@ -172,6 +193,8 @@ def main():
     failures = [r for r in forward_rows if r['status'] not in ('checked', 'skipped')]
     failures += [r for r in record['cli_help'] if not r['passed']]
     failures += [key for key, value in record['config_checks'].items() if value is False]
+    if not record['integrity_guards']['passed']:
+        failures.append(record['integrity_guards'])
     (ROOT / args.out).write_text(json.dumps(record, indent=2) + '\n', encoding='utf-8')
     print(f'\nWrote {args.out}')
     if failures:

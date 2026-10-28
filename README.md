@@ -30,8 +30,8 @@ code/
 │   ├── sdwpf.py            SDWPF cache loader (134 turbines, 16 variables)
 │   ├── hill21.py           Hill of Towie raw-to-panel builder (21 turbines, 7 variables)
 │   └── priors.py           training-only graph/DTW/pattern priors
-├── exp/                    trainer, evaluator, inference-cost benchmark, reporter
-├── utils/                  checkpoint IO, seeding, plotting, parameter counting
+├── exp/                    trainer, evaluator, guards, cost benchmark, reporter
+├── utils/                  checkpoint identity, seeding, plotting, parameter counting
 ├── datasets/
 │   ├── SDWPF/              config.json + data/, train_priors.npz (both untracked)
 │   └── Hill21/             config.json + data audit + FEDformer recovery records
@@ -40,7 +40,9 @@ code/
 ```
 
 Every dataset keeps its own folder: `code/datasets/SDWPF` and `code/datasets/Hill21` each
-hold the configuration, the audit record and the (untracked) data cache.
+hold the configuration, the audit record and the (untracked) data cache. Supporting
+records: `docs/EXPERIMENT_REVIEW_20261028.md` (protocol review against the manuscript) and
+`docs/PAPER_CODE_MAPPING.md` (claim-by-claim map).
 
 ## Installation
 Use a separate Python environment. GPU training uses NVIDIA CUDA; install a matching
@@ -96,17 +98,28 @@ redistributed here.
 
 ## Verification without training
 ```sh
-python tools/verify_sources.py     # packaged file hashes + Python syntax
-python tools/smoke_checks.py       # CPU forward checks, parameter counts vs the paper
+python tools/verify_sources.py         # packaged file hashes + Python syntax
+python tools/smoke_checks.py           # CPU forward checks, parameter counts vs the paper
+python tools/test_integrity_guards.py  # checkpoint rho, run reuse and window origins
 ```
 `verify_sources.py` checks the packaged hashes and parses every Python file without
 importing models or starting training. `smoke_checks.py` builds every architecture on CPU,
 compares the parameter counts with the values printed in Tables 4 and 7, cross-checks both
-dataset configurations against their audit records, and pings each entry point; it writes
-`provenance/smoke_checks.json`. Four adapters need inputs that are not redistributed (the
-training-only prior file for PDFormer and the separately fetched StemGNN source) and are
-reported as skipped. After an intentional source edit, regenerate the hash manifest with
-`python tools/update_manifest.py`.
+dataset configurations against their audit records, runs the integrity guards and pings each
+entry point; it writes `provenance/smoke_checks.json`. Four adapters need inputs that are
+not redistributed (the training-only prior file for PDFormer and the separately fetched
+StemGNN source) and are reported as skipped. After an intentional source edit, regenerate
+the hash manifest with `python tools/update_manifest.py`.
+
+## Checkpoint and run identity
+New checkpoints carry a hash-bound sidecar that records the frequency index lists and the
+residual coefficient, so loading weights trained with a different `rho` fails even when all
+tensor names and shapes match. Plain historical `state_dict` files remain loadable, but they
+do not encode `rho`; the metadata record marks whether it was verified. Before a run
+directory is reused or resumed, its stored configuration is compared with the current one,
+including the shuffle choice, and a mismatch raises instead of silently mixing results.
+`python tools/test_integrity_guards.py` exercises these protections and checks that the
+window helper reproduces the paper's origins and counts.
 
 ## Disclosures
 Both evaluation panels were inspected during development, and both dataset configurations

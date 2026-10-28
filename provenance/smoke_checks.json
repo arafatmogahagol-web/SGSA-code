@@ -1,12 +1,12 @@
 {
-  "generated": "2026-10-28T18:47:06",
+  "generated": "2026-10-28T18:50:56",
   "platform": "Windows-11-10.0.26200-SP0",
   "python": "3.12.4",
   "torch": "2.6.0+cu124",
   "cuda_available": false,
   "training_started": false,
   "layout": "code/{SGSA.py,run.py,layers,models,data_provider,exp,utils,datasets,checkpoints,results}",
-  "python_sources_parsed": 33,
+  "python_sources_parsed": 34,
   "config_checks": {
     "sdwpf_has_selection_key": true,
     "sdwpf_has_expected_counts": true,
@@ -65,6 +65,11 @@
       "returncode": 0
     }
   ],
+  "integrity_guards": {
+    "script": "tools/test_integrity_guards.py",
+    "passed": true,
+    "summary": "OK"
+  },
   "model_forward_checks": [
     {
       "dataset": "SDWPF",

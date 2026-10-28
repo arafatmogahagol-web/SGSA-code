@@ -1,10 +1,14 @@
-"""Strict checkpoint IO plus hash-bound Fourier metadata.
+"""Strict checkpoint IO, run-identity checks and hash-bound metadata.
 
-FEDformer keeps its selected frequency index lists as plain module attributes,
-not as ``state_dict`` buffers, so a checkpoint is only complete together with a
-JSON sidecar that records them. ``save_checkpoint`` writes the sidecar;
+FEDformer keeps its selected frequency index lists as plain module attributes, not
+as ``state_dict`` buffers, so a checkpoint is only complete together with a JSON
+sidecar that records them. The sidecar also records the residual coefficient
+``rho``: two models can have identical tensor names and shapes while using
+different coefficients, so weights alone do not identify a run.
+
 ``load_checkpoint`` refuses to load a Fourier model whose modes cannot be
-restored instead of silently sampling new ones.
+restored, and refuses a checkpoint whose recorded ``rho`` disagrees with the model
+it is being loaded into.
 """
 import json
 from pathlib import Path
@@ -14,6 +18,7 @@ import torch
 from utils.io import sha256
 
 FOURIER_ATTRS = ('index', 'index_q', 'index_kv')
+SCHEMA_VERSION = 2
 
 
 def frequency_indices(model):
@@ -28,6 +33,12 @@ def frequency_indices(model):
         if attrs:
             result[name] = attrs
     return result
+
+
+def residual_coefficients(model):
+    """Non-tensor coefficients (currently ``rho``) that are part of run identity."""
+    return {name: float(module.rho) for name, module in model.named_modules()
+            if hasattr(module, 'rho') and isinstance(module.rho, (int, float))}
 
 
 def restore_frequency_indices(model, indices):
@@ -47,6 +58,20 @@ def restore_frequency_indices(model, indices):
         raise RuntimeError('Fourier index restoration failed')
 
 
+def validate_run_config(path, expected, artifacts=()):
+    """Refuse to reuse a completed or partial run that used a different protocol."""
+    path = Path(path)
+    if not path.exists():
+        if any(Path(p).exists() for p in artifacts):
+            raise ValueError('Existing run lacks configuration: ' + str(path))
+        return
+    saved = json.loads(path.read_text(encoding='utf-8'))
+    changed = [key for key, value in expected.items() if key not in saved or saved[key] != value]
+    if changed:
+        raise ValueError('Existing run configuration differs on: ' + ', '.join(changed)
+                         + '. Use a separate run directory.')
+
+
 def save_checkpoint(model, path):
     """Save the ordinary state_dict plus a hash-bound JSON metadata sidecar."""
     path = Path(path)
@@ -54,8 +79,9 @@ def save_checkpoint(model, path):
     temporary = path.with_suffix(path.suffix + '.tmp')
     torch.save(model.state_dict(), temporary)
     temporary.replace(path)
-    metadata = {'schema_version': 1, 'checkpoint_sha256': sha256(path),
-                'frequency_indices': frequency_indices(model)}
+    metadata = {'schema_version': SCHEMA_VERSION, 'checkpoint_sha256': sha256(path),
+                'frequency_indices': frequency_indices(model),
+                'residual_coefficients': residual_coefficients(model)}
     sidecar = path.with_suffix(path.suffix + '.metadata.json')
     temporary = sidecar.with_suffix(sidecar.suffix + '.tmp')
     temporary.write_text(json.dumps(metadata, indent=2), encoding='utf-8')
@@ -64,7 +90,7 @@ def save_checkpoint(model, path):
 
 
 def load_checkpoint(model, path, recovery_dir=None):
-    """Load strictly; a Fourier model cannot silently use newly sampled modes."""
+    """Load strictly; Fourier modes and the residual coefficient must match."""
     path = Path(path)
     digest = sha256(path)
     sidecar = path.with_suffix(path.suffix + '.metadata.json')
@@ -76,7 +102,10 @@ def load_checkpoint(model, path, recovery_dir=None):
                 metadata = record
                 break
     if metadata is not None and metadata.get('checkpoint_sha256') != digest:
-        raise ValueError('Checkpoint hash does not match its Fourier metadata')
+        raise ValueError('Checkpoint hash does not match its metadata')
+    if metadata is not None and 'residual_coefficients' in metadata:
+        if metadata['residual_coefficients'] != residual_coefficients(model):
+            raise ValueError('Checkpoint residual coefficient (rho) does not match the model')
     if frequency_indices(model):
         if metadata is None:
             raise ValueError('Missing Fourier metadata. Supply the original hash-matched '
@@ -84,4 +113,5 @@ def load_checkpoint(model, path, recovery_dir=None):
         restore_frequency_indices(model, metadata['frequency_indices'])
     state = torch.load(path, map_location='cpu', weights_only=True)
     model.load_state_dict(state, strict=True)
-    return {'checkpoint_sha256': digest, 'frequency_indices': frequency_indices(model)}
+    return {'checkpoint_sha256': digest, 'frequency_indices': frequency_indices(model),
+            'rho_verified': metadata is not None and 'residual_coefficients' in metadata}

@@ -22,7 +22,7 @@ from data_provider import load_priors, windows
 from data_provider.common import loader
 from exp.evaluator import evaluate
 from models import build
-from utils.checkpoints import load_checkpoint, save_checkpoint
+from utils.checkpoints import load_checkpoint, save_checkpoint, validate_run_config
 from utils.io import atomic_save, csvwrite, dump, sha256
 from utils.params import parameter_counts
 from utils.plotting import plot_adjacency, plot_loss
@@ -42,6 +42,12 @@ def train_run(dataset, name, strategy, seed, cfg, data, dirs, device,
     out_dir = Path(dirs['results']) / name / strategy / str(seed)
     run_dir.mkdir(parents=True, exist_ok=True)
     out_dir.mkdir(parents=True, exist_ok=True)
+    micro = int(micro or cfg.get('micro_batch') or cfg['batch_size'])
+    # Never resume or reuse a run directory that was produced with another protocol.
+    identity = dict(cfg, dataset=dataset, model=name, strategy=strategy, seed=seed,
+                    micro_batch=micro, shuffle_each_epoch=reshuffle)
+    validate_run_config(out_dir / 'config.json', identity,
+                        [run_dir / 'last.pt', run_dir / 'best.pt', out_dir / 'complete.json'])
     if (out_dir / 'complete.json').exists():
         return {'status': 'already_complete', 'run': str(out_dir)}
 
@@ -50,17 +56,13 @@ def train_run(dataset, name, strategy, seed, cfg, data, dirs, device,
     model = build(name, data_cfg, device=str(device), priors=priors).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=cfg['learning_rate'],
                                   weight_decay=cfg['weight_decay'])
-    micro = int(micro or cfg.get('micro_batch') or cfg['batch_size'])
     train_windows = windows(dataset, data, 'train', cfg,
                             augmentation=strategy == 'noise', seed=cfg['augmentation_seed'])
     val_windows = windows(dataset, data, 'val', cfg,
                           augmentation=strategy == 'noise', seed=cfg['validation_noise_seed'])
     steps = math.ceil(len(train_windows) / cfg['batch_size'])
 
-    dump(out_dir / 'config.json', dict(cfg, dataset=dataset, model=name, strategy=strategy,
-                                       seed=seed, micro_batch=micro,
-                                       shuffle_each_epoch=reshuffle,
-                                       parameters=parameter_counts(model)))
+    dump(out_dir / 'config.json', identity)
     history, best, stale, start_epoch = [], float('inf'), 0, 1
     if (run_dir / 'last.pt').exists():
         state = torch.load(run_dir / 'last.pt', map_location='cpu', weights_only=False)
@@ -107,6 +109,8 @@ def train_run(dataset, name, strategy, seed, cfg, data, dirs, device,
                           epoch=epoch, step=step, steps=steps, time=_now()))
 
         validation = evaluate(model, val_windows, cfg, micro=micro)
+        if not labels:
+            raise RuntimeError('No valid training labels in this epoch')
         record = dict(epoch=epoch, train_mse=total / labels, val_mse=validation['mse'],
                       val_mae=validation['mae'], val_rmse=validation['rmse'],
                       seconds=_now() - begin)
@@ -131,7 +135,8 @@ def train_run(dataset, name, strategy, seed, cfg, data, dirs, device,
                                            best_validation=best,
                                            selection=cfg['selection_key'],
                                            epochs_run=len(history),
-                                           micro_batch=micro))
+                                           micro_batch=micro,
+                                           parameters=parameter_counts(model)))
     expected = cfg['expected_valid_test_points']
     for method, severity in [('clean', None), ('corrupted', 2)]:
         folder = out_dir / method

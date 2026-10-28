@@ -1,35 +1,53 @@
-"""CPU regression tests for checkpoint and run identity; no experiment data required."""
+"""CPU regression tests for checkpoint identity, run identity and window origins.
+
+No experiment data, no GPU and no training are required:
+
+    python tools/test_integrity_guards.py
+"""
 import json
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-import torch
 import numpy as np
-from types import SimpleNamespace
+import torch
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
-from sgsa_utils.model import SGSA
-from sgsa_utils.checkpoints import load_checkpoint, save_checkpoint, validate_run_config
+CODE = ROOT / 'code'
+sys.path.insert(0, str(CODE))
+
+from SGSA import SGSA
+from data_provider.common import PreparedData, window_starts
+from exp.guards import FROZEN, validate_protocol
+from utils.checkpoints import load_checkpoint, save_checkpoint, validate_run_config
+
+
+def _fake_data(split, timestamps=20000, nodes=2, features=1):
+    zeros = np.zeros((timestamps, nodes, features), dtype='float32')
+    mask = np.ones((timestamps, nodes), dtype=bool)
+    return PreparedData(name='synthetic', x=zeros, y=np.zeros((timestamps, nodes)), mask=mask,
+                        finite_inputs=np.ones_like(zeros, dtype=bool),
+                        feature_mean=np.zeros(features), feature_std=np.ones(features),
+                        feature_median=np.zeros(features), target_mean=0.0, target_std=1.0,
+                        feature_names=[f'f{i}' for i in range(features)], target_name='f0',
+                        timestamps=np.arange(timestamps), turbine_ids=np.arange(nodes),
+                        split=split)
 
 
 class IntegrityGuards(unittest.TestCase):
-    def test_clean_split_helper_matches_benchmark_origins(self):
-        sys.path.insert(0, str(ROOT / 'experiments/SDWPF/code'))
-        from preprocessing import make_splits
-        from data_loader import Windows
-        data = SimpleNamespace(
-            split={'train': (0, 14000), 'val': (14000, 15000), 'test': (16000, 20000)},
-            timestamps=np.arange(20000), feature_median=np.zeros(1),
-            feature_mean=np.zeros(1), feature_std=np.ones(1))
-        clean = make_splits(data, 96, 48)
-        for part, helper, count in zip(('train', 'val', 'test'), clean, (3465, 40, 165)):
-            benchmark = Windows.for_partition(data, part, stride=4 if part == 'train' else 24)
-            self.assertEqual(helper.starts, benchmark.starts)
-            self.assertEqual(len(helper), count)
-            self.assertGreaterEqual(helper.starts[0], 96)
+    def test_window_origins_match_the_reported_counts(self):
+        """The window helper reproduces the counts and origins stated in the paper."""
+        data = _fake_data({'train': (0, 14000), 'val': (14000, 15000), 'test': (16000, 20000)})
+        for dataset, expected in [('SDWPF', (3465, 40, 165))]:
+            cfg = dict(FROZEN[dataset], expected_windows=dict(train=expected[0],
+                                                             val=expected[1], test=expected[2]))
+            counts = []
+            for partition in ('train', 'val', 'test'):
+                starts = window_starts(data, partition, cfg)
+                counts.append(len(starts))
+                self.assertGreaterEqual(int(starts[0]), cfg['seq_len'])
+            self.assertEqual(tuple(counts), expected)
 
     def test_rho_mismatch_is_rejected_even_when_tensor_shapes_match(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -65,12 +83,12 @@ class IntegrityGuards(unittest.TestCase):
     def test_run_configuration_cannot_be_silently_reused(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / 'config.json'
-            expected = dict(rho=.25, seed=2024, reshuffle_each_epoch=False,
+            expected = dict(rho=.25, seed=2024, shuffle_each_epoch=False,
                             split={'train': [0, 100]}, learning_rate=.0005)
             validate_run_config(path, expected)
             path.write_text(json.dumps(expected), encoding='utf-8')
             validate_run_config(path, expected)
-            for key, value in [('rho', .5), ('seed', 2025), ('reshuffle_each_epoch', True),
+            for key, value in [('rho', .5), ('seed', 2025), ('shuffle_each_epoch', True),
                                ('split', {'train': [0, 200]}), ('learning_rate', .001)]:
                 with self.subTest(key=key), self.assertRaisesRegex(ValueError, key):
                     validate_run_config(path, dict(expected, **{key: value}))
@@ -80,6 +98,13 @@ class IntegrityGuards(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'lacks configuration'):
                 validate_run_config(path, expected, [checkpoint])
 
+    def test_frozen_protocol_guard_rejects_a_changed_coefficient(self):
+        cfg = dict(FROZEN['SDWPF'])
+        self.assertTrue(validate_protocol('SDWPF', cfg))
+        for key, value in [('rho', 0.5), ('epochs', 40), ('selection_key', 'val_mae')]:
+            with self.subTest(key=key), self.assertRaises(SystemExit):
+                validate_protocol('SDWPF', dict(cfg, **{key: value}))
+
 
 if __name__ == '__main__':
-    unittest.main()
+    unittest.main(verbosity=2)
