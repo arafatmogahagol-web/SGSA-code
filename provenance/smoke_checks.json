@@ -1,0 +1,370 @@
+{
+  "generated": "2026-10-28T17:24:34",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python": "3.12.4",
+  "torch": "2.6.0+cu124",
+  "cuda_available": false,
+  "training_started": false,
+  "python_sources_parsed": 326,
+  "config_checks": {
+    "sdwpf_split_matches_preprocessing": true,
+    "hill21_split_matches_audit": true,
+    "hill21_window_counts": {
+      "train": 729,
+      "validation": 26,
+      "test": 26
+    },
+    "hill21_expected_windows": {
+      "train": 729,
+      "validation": 26,
+      "test": 26
+    },
+    "hill21_expected_valid_test_points": 26187,
+    "sdwpf_expected_valid_test_points": 966746,
+    "sdwpf_expected_windows": {
+      "train": 3465,
+      "val": 40,
+      "test": 165
+    }
+  },
+  "cli_help": [
+    {
+      "script": "experiments/SDWPF/code/run_suite.py",
+      "passed": true,
+      "returncode": 0
+    },
+    {
+      "script": "experiments/SDWPF/code/sgsa_train.py",
+      "passed": true,
+      "returncode": 0
+    },
+    {
+      "script": "experiments/SDWPF/code/sgsa_evaluate.py",
+      "passed": true,
+      "returncode": 0
+    },
+    {
+      "script": "experiments/Hill21/code/worker.py",
+      "passed": true,
+      "returncode": 0
+    },
+    {
+      "script": "tools/fetch_stemgnn.py",
+      "passed": true,
+      "returncode": 0
+    },
+    {
+      "script": "tools/update_manifest.py",
+      "passed": true,
+      "returncode": 0
+    },
+    {
+      "script": "tools/smoke_checks.py",
+      "passed": true,
+      "returncode": 0
+    }
+  ],
+  "model_forward_checks": [
+    {
+      "dataset": "SDWPF",
+      "model": "SGSA",
+      "output_shape": [
+        1,
+        48,
+        134
+      ],
+      "parameters": 23216,
+      "expected_parameters": 23216,
+      "status": "checked"
+    },
+    {
+      "dataset": "SDWPF",
+      "model": "MultiGSA_adapted",
+      "output_shape": [
+        1,
+        48,
+        134
+      ],
+      "parameters": 34033,
+      "expected_parameters": 34033,
+      "status": "checked"
+    },
+    {
+      "dataset": "SDWPF",
+      "model": "LSTM",
+      "output_shape": [
+        1,
+        48,
+        134
+      ],
+      "parameters": 75056,
+      "expected_parameters": 75056,
+      "status": "checked"
+    },
+    {
+      "dataset": "SDWPF",
+      "model": "Transformer",
+      "output_shape": [
+        1,
+        48,
+        134
+      ],
+      "parameters": 81584,
+      "expected_parameters": 81584,
+      "status": "checked"
+    },
+    {
+      "dataset": "SDWPF",
+      "model": "MTGNN",
+      "output_shape": [
+        1,
+        48,
+        134
+      ],
+      "parameters": 5264032,
+      "expected_parameters": 5264032,
+      "status": "checked"
+    },
+    {
+      "dataset": "SDWPF",
+      "model": "FEDformer",
+      "output_shape": [
+        1,
+        48,
+        134
+      ],
+      "parameters": 225040,
+      "expected_parameters": 225040,
+      "status": "checked"
+    },
+    {
+      "dataset": "SDWPF",
+      "model": "GraphWaveNet",
+      "output_shape": [
+        1,
+        48,
+        134
+      ],
+      "parameters": 764520,
+      "expected_parameters": 764520,
+      "status": "checked"
+    },
+    {
+      "dataset": "SDWPF",
+      "model": "AGCRN",
+      "output_shape": [
+        1,
+        48,
+        134
+      ],
+      "parameters": 807020,
+      "expected_parameters": 807020,
+      "status": "checked"
+    },
+    {
+      "dataset": "SDWPF",
+      "model": "STID_no_calendar",
+      "output_shape": [
+        1,
+        48,
+        134
+      ],
+      "parameters": 163184,
+      "expected_parameters": 163184,
+      "status": "checked"
+    },
+    {
+      "dataset": "SDWPF",
+      "model": "DLinear",
+      "output_shape": [
+        1,
+        48,
+        134
+      ],
+      "parameters": 9312,
+      "expected_parameters": 9312,
+      "status": "checked"
+    },
+    {
+      "dataset": "SDWPF",
+      "model": "PatchTST",
+      "output_shape": [
+        1,
+        48,
+        134
+      ],
+      "parameters": 105746,
+      "expected_parameters": 105746,
+      "status": "checked"
+    },
+    {
+      "dataset": "SDWPF",
+      "model": "PDFormer_train_graph",
+      "parameters": null,
+      "expected_parameters": 444017,
+      "status": "skipped",
+      "reason": "FileNotFoundError: [Errno 2] No such file or directory: 'D:\\\\SGSA_Paper\\\\final paper\\\\code\\\\experiments\\\\SDWPF\\\\train_priors.npz'"
+    },
+    {
+      "dataset": "SDWPF",
+      "model": "StemGNN_power_only",
+      "parameters": null,
+      "expected_parameters": 67496332,
+      "status": "skipped",
+      "reason": "FileNotFoundError: [Errno 2] No such file or directory: 'D:\\\\SGSA_Paper\\\\final paper\\\\code\\\\vendor\\\\StemGNN\\\\models\\\\base_model.py'"
+    },
+    {
+      "dataset": "Hill21",
+      "model": "SGSA",
+      "output_shape": [
+        1,
+        48,
+        21
+      ],
+      "parameters": 19024,
+      "expected_parameters": 19024,
+      "status": "checked"
+    },
+    {
+      "dataset": "Hill21",
+      "model": "MultiGSA_adapted",
+      "output_shape": [
+        1,
+        48,
+        21
+      ],
+      "parameters": 29841,
+      "expected_parameters": 29841,
+      "status": "checked"
+    },
+    {
+      "dataset": "Hill21",
+      "model": "LSTM",
+      "output_shape": [
+        1,
+        48,
+        21
+      ],
+      "parameters": 74480,
+      "expected_parameters": 74480,
+      "status": "checked"
+    },
+    {
+      "dataset": "Hill21",
+      "model": "Transformer",
+      "output_shape": [
+        1,
+        48,
+        21
+      ],
+      "parameters": 81008,
+      "expected_parameters": 81008,
+      "status": "checked"
+    },
+    {
+      "dataset": "Hill21",
+      "model": "MTGNN",
+      "output_shape": [
+        1,
+        48,
+        21
+      ],
+      "parameters": 1988112,
+      "expected_parameters": 1988112,
+      "status": "checked"
+    },
+    {
+      "dataset": "Hill21",
+      "model": "FEDformer",
+      "output_shape": [
+        1,
+        48,
+        21
+      ],
+      "parameters": 219271,
+      "expected_parameters": 219271,
+      "status": "checked"
+    },
+    {
+      "dataset": "Hill21",
+      "model": "GraphWaveNet",
+      "output_shape": [
+        1,
+        48,
+        21
+      ],
+      "parameters": 761684,
+      "expected_parameters": 761684,
+      "status": "checked"
+    },
+    {
+      "dataset": "Hill21",
+      "model": "AGCRN",
+      "output_shape": [
+        1,
+        48,
+        21
+      ],
+      "parameters": 771330,
+      "expected_parameters": 771330,
+      "status": "checked"
+    },
+    {
+      "dataset": "Hill21",
+      "model": "STID_no_calendar",
+      "output_shape": [
+        1,
+        48,
+        21
+      ],
+      "parameters": 104272,
+      "expected_parameters": 104272,
+      "status": "checked"
+    },
+    {
+      "dataset": "Hill21",
+      "model": "DLinear",
+      "output_shape": [
+        1,
+        48,
+        21
+      ],
+      "parameters": 9312,
+      "expected_parameters": 9312,
+      "status": "checked"
+    },
+    {
+      "dataset": "Hill21",
+      "model": "PatchTST",
+      "output_shape": [
+        1,
+        48,
+        21
+      ],
+      "parameters": 105728,
+      "expected_parameters": 105728,
+      "status": "checked"
+    },
+    {
+      "dataset": "Hill21",
+      "model": "PDFormer_train_graph",
+      "parameters": null,
+      "expected_parameters": 443441,
+      "status": "skipped",
+      "reason": "FileNotFoundError: [Errno 2] No such file or directory: 'D:\\\\SGSA_Paper\\\\final paper\\\\code\\\\experiments\\\\Hill21\\\\train_priors.npz'"
+    },
+    {
+      "dataset": "Hill21",
+      "model": "StemGNN_power_only",
+      "parameters": null,
+      "expected_parameters": 67410339,
+      "status": "skipped",
+      "reason": "FileNotFoundError: [Errno 2] No such file or directory: 'D:\\\\SGSA_Paper\\\\final paper\\\\code\\\\vendor\\\\StemGNN\\\\models\\\\base_model.py'"
+    }
+  ],
+  "limitations": [
+    "CPU single-batch forward checks only; no dataset, checkpoint or GPU measurement.",
+    "PDFormer requires the training-only prior file and StemGNN requires its separately fetched upstream source; both are reported as skipped when absent.",
+    "The two protocols run in separate processes because they share adapter module names."
+  ]
+}

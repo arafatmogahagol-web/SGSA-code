@@ -1,14 +1,11 @@
-"""Temporal SimAM used by the audited historical SDWPF implementation."""
-import torch
-from torch import nn
+"""Re-export of the canonical temporal SimAM module (``sgsa_utils/model.py``)."""
+import sys
+from pathlib import Path
 
-class SimAM1D(nn.Module):
-    def __init__(self, eps=1e-4):
-        super().__init__()
-        self.eps = eps
+ROOT = Path(__file__).resolve().parents[3]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
-    def forward(self, x):
-        mean = x.mean(dim=1, keepdim=True)
-        var = x.var(dim=1, keepdim=True, unbiased=False)
-        energy = (x - mean).square() / (4.0 * (var + self.eps)) + 0.5
-        return x * torch.sigmoid(energy)
+from sgsa_utils.model import SimAM1D  # noqa: E402
+
+__all__ = ['SimAM1D']

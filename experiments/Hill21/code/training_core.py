@@ -7,6 +7,12 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[3]))
 from sgsa_utils.checkpoints import save_checkpoint
 # Model factory is supplied explicitly by worker.py
 ROOT=Path(__file__).resolve().parents[1]; PAPER=ROOT/'outputs'
+# Window shape and the paper's valid-test-point count (Table 5).
+SEQ_LEN,PRED_LEN=96,48
+EXPECTED_VALID_TEST_POINTS=26187
+def real_scalars(model):
+ # A complex parameter counts as two real scalars, as stated in the paper.
+ return sum(p.numel()*(2 if p.is_complex() else 1) for p in model.parameters())
 def write(p,d):p.parent.mkdir(parents=True,exist_ok=True);q=p.with_suffix(p.suffix+'.tmp');q.write_text(json.dumps(d,indent=2));q.replace(p)
 def status(**kw):write(ROOT/'status.json',dict(updated=time.time(),**kw))
 class Windows(Dataset):
@@ -14,7 +20,7 @@ class Windows(Dataset):
   self.data=data;self.starts=data[part+'_starts'];self.noise=noise;self.condition=condition;self.epoch=0
  def __len__(self):return len(self.starts)
  def __getitem__(self,i):
-  t=int(self.starts[i]);x=self.data['x'][t-96:t].copy();y=self.data['y'][t:t+48];m=self.data['mask'][t:t+48]
+  t=int(self.starts[i]);x=self.data['x'][t-SEQ_LEN:t].copy();y=self.data['y'][t:t+PRED_LEN];m=self.data['mask'][t:t+PRED_LEN]
   seed=(2024+t*1009+self.epoch*1000003+(701 if self.condition=='corrupted' else 0))%2**32;rng=np.random.default_rng(seed)
   level='none'
   if self.condition=='corrupted':level='heavy'
@@ -32,7 +38,7 @@ def loader(ds,shuffle,seed,batch_size=32):
  return DataLoader(ds,batch_size=batch_size,shuffle=shuffle,num_workers=0,generator=g)
 @torch.no_grad()
 def evaluate(model,ds,save=None):
- model.eval();sa=ss=count=0;ah=np.zeros(48);sh=ah.copy();ch=ah.copy();pred=[];target=[];mask=[];times=[]
+ model.eval();sa=ss=count=0;ah=np.zeros(PRED_LEN);sh=ah.copy();ch=ah.copy();pred=[];target=[];mask=[];times=[]
  for x,y,m,t in loader(ds,False,0):
   p=model(x.to(next(model.parameters()).device)).cpu().numpy();yy=y.numpy();mm=m.numpy();e=p-yy
   sa+=np.abs(e)[mm].sum(dtype=np.float64);ss+=np.square(e)[mm].sum(dtype=np.float64);count+=int(mm.sum())
@@ -42,7 +48,7 @@ def evaluate(model,ds,save=None):
  d=dict(mae=sa/count,rmse=(ss/count)**.5,mse=ss/count,valid_points=count,windows=len(ds))
  if save is not None:
   np.savez_compressed(str(save)+'.npz',prediction=np.concatenate(pred),target=np.concatenate(target),mask=np.concatenate(mask),origins=np.array(times),turbine_ids=ds.data['turbine_ids'])
-  np.savetxt(str(save)+'_horizon.csv',np.stack([np.arange(1,49),ah/np.maximum(ch,1),(sh/np.maximum(ch,1))**.5,ch],1),delimiter=',',header='horizon,mae,rmse,count',comments='')
+  np.savetxt(str(save)+'_horizon.csv',np.stack([np.arange(1,PRED_LEN+1),ah/np.maximum(ch,1),(sh/np.maximum(ch,1))**.5,ch],1),delimiter=',',header='horizon,mae,rmse,count',comments='')
  return d
 
 def train(name,cfg,seed,strategy,path,data):
@@ -53,7 +59,7 @@ def train(name,cfg,seed,strategy,path,data):
   if name=='SGSA' and saved.get('rho',.25)!=cfg.get('rho',.25):raise ValueError('Existing checkpoint rho mismatch')
   return json.loads((path/'complete.json').read_text())
  path.mkdir(parents=True,exist_ok=True);random.seed(seed);np.random.seed(seed);torch.manual_seed(seed);torch.cuda.manual_seed_all(seed)
- model=build(name,data['x'].shape[1],data['x'].shape[2],cfg['dropout'],rho=cfg.get('rho',.25)).cuda();opt=torch.optim.AdamW(model.parameters(),lr=cfg['learning_rate'],weight_decay=1e-4)
+ model=build(name,data['x'].shape[1],data['x'].shape[2],cfg['dropout'],rho=cfg.get('rho',.25)).cuda();opt=torch.optim.AdamW(model.parameters(),lr=cfg['learning_rate'],weight_decay=cfg.get('weight_decay',1e-4))
  tr=Windows(data,'train',noise=strategy=='noise');val=Windows(data,'validation',noise=strategy=='noise')
  best=float('inf');stale=0;history=[];write(path/'config.json',dict(cfg,seed=seed,strategy=strategy,model=name,rho=cfg.get('rho',.25) if name=='SGSA' else None))
  for epoch in range(1,cfg.get('epochs',50)+1):
@@ -63,7 +69,7 @@ def train(name,cfg,seed,strategy,path,data):
    if not len(e):continue
    loss=e.square().mean()
    if not torch.isfinite(loss):raise ValueError('Nonfinite loss')
-   loss.backward();torch.nn.utils.clip_grad_norm_(model.parameters(),1);opt.step();ss+=float(e.detach().square().sum());count+=e.numel()
+   loss.backward();torch.nn.utils.clip_grad_norm_(model.parameters(),cfg.get('gradient_clip',1));opt.step();ss+=float(e.detach().square().sum());count+=e.numel()
   score=evaluate(model,val);history.append(dict(epoch=epoch,train_mse=ss/count,val_mae=score['mae'],val_rmse=score['rmse'],seconds=time.time()-tick))
   with (path/'history.csv').open('w',newline='') as f:w=csv.DictWriter(f,fieldnames=list(history[-1]));w.writeheader();w.writerows(history)
   print(name,strategy,seed,cfg,history[-1],flush=True)
@@ -72,5 +78,5 @@ def train(name,cfg,seed,strategy,path,data):
    best=score['mae'];stale=0;save_checkpoint(model,path/'best.pt');best_epoch=epoch
   else:stale+=1
   if stale>=cfg.get('patience',8):break
- result=dict(best_validation_mae=best,best_epoch=best_epoch,epochs=len(history),parameters=sum(p.numel() for p in model.parameters()));write(path/'complete.json',result)
+ result=dict(best_validation_mae=best,best_epoch=best_epoch,epochs=len(history),parameters=real_scalars(model));write(path/'complete.json',result)
  del model,opt;torch.cuda.empty_cache();return result

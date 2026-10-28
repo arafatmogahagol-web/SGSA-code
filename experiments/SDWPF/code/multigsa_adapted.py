@@ -1,22 +1,23 @@
-"""MultiGSA-style baseline adapted from [B, time, turbine, feature] to SDWPF."""
+"""MultiGSA-style baseline adapted from [B, time, turbine, feature] to SDWPF.
+
+This is a structural adaptation, not an exact reproduction of the original
+paper's datasets, architecture settings or training recipe.
+"""
 from __future__ import annotations
+
+import sys
+from pathlib import Path
 
 import torch
 from torch import nn
 from torch.nn import functional as F
 
-
-class SimAM1D(nn.Module):
-    def __init__(self, eps: float = 1e-4):
-        super().__init__()
-        self.eps = eps
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # x: [batch, time, turbine, hidden]
-        mean = x.mean(dim=1, keepdim=True)
-        var = x.var(dim=1, keepdim=True, unbiased=False)
-        energy = (x - mean).square() / (4.0 * (var + self.eps)) + 0.5
-        return x * torch.sigmoid(energy)
+# One implementation of the parameter-free statistical attention (paper Eq. 4)
+# is shared with the proposed model instead of a second identical copy.
+ROOT = Path(__file__).resolve().parents[3]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+from sgsa_utils.model import SimAM1D  # noqa: E402
 
 
 class LearnedGraph(nn.Module):

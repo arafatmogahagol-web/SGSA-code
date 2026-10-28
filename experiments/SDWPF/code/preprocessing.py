@@ -1,3 +1,19 @@
+"""Chronological SDWPF preprocessing with one explicit protocol split.
+
+The half-open index ranges below are the split reported in the paper
+(Table 2). They are defined once here, mirrored in
+``experiments/SDWPF/config.json``, and asserted to agree by the benchmark, so
+the helper functions and the paper protocol cannot drift apart.
+
+Leakage rules implemented here:
+
+* the variable-wise mean/std used for z-scoring and the variable-wise median
+  used for imputation are computed from the training range only;
+* the target array is never imputed - a missing label stays missing in
+  ``y_mask`` and is excluded from both the loss and the metrics;
+* feature arrays outside the training range only ever consume statistics
+  estimated inside the training range.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -6,6 +22,10 @@ from pathlib import Path
 import numpy as np
 import torch
 from torch.utils.data import Dataset
+
+# Paper Table 2: training / validation / unused / test index ranges.
+PROTOCOL_SPLIT = {'train': (0, 14000), 'val': (14000, 15000),
+                  'unused': (15000, 16000), 'test': (16000, 20000)}
 
 
 @dataclass
@@ -19,15 +39,16 @@ class PreparedData:
     feature_names: list[str]
     target_mean: float
     target_std: float
-    train_end: int
-    val_end: int
     feature_mean: np.ndarray
     feature_std: np.ndarray
     feature_median: np.ndarray
+    split: dict
 
 
 class ForecastWindows(Dataset):
-    def __init__(self, data: PreparedData, starts: list[int], seq_len: int, pred_len: int):
+    """Clean (uncorrupted) windows evaluated with stride 1 by default."""
+
+    def __init__(self, data: PreparedData, starts, seq_len: int, pred_len: int):
         self.data = data
         self.starts = starts
         self.seq_len = seq_len
@@ -49,27 +70,44 @@ class ForecastWindows(Dataset):
         )
 
 
-def load_and_prepare(path: str | Path, train_ratio: float = 0.70, val_ratio: float = 0.15) -> PreparedData:
+def check_split(split, total_steps: int) -> dict:
+    """Validate the protocol split and return it as ``{name: (start, end)}``."""
+    if not isinstance(split, dict) or 'train' not in split or 'test' not in split:
+        raise ValueError('split must define at least train and test ranges')
+    ranges = {}
+    for name, bounds in split.items():
+        start, end = int(bounds[0]), int(bounds[1])
+        if not 0 <= start < end <= total_steps:
+            raise ValueError(f'Split {name!r} out of bounds: {(start, end)}')
+        ranges[name] = (start, end)
+    if ranges['train'][0] != 0:
+        raise ValueError('The training range must start at index 0')
+    ordered = [ranges[n] for n in ('train', 'val', 'unused', 'test') if n in ranges]
+    for (_, end), (next_start, _) in zip(ordered, ordered[1:]):
+        if end > next_start:
+            raise ValueError('Split ranges must not overlap')
+    return ranges
+
+
+def load_and_prepare(path: str | Path, split=None) -> PreparedData:
     with np.load(path, allow_pickle=False) as archive:
-        values = archive["values"].astype(np.float32)
-        reference_values = (archive["normalization_values"].astype(np.float32)
-                           if "normalization_values" in archive else values)
-        target_values = (archive["target_values"].astype(np.float32)
-                         if "target_values" in archive else reference_values)
-        turbine_ids = archive["turbine_ids"].copy()
-        timestamps = archive["timestamps"].copy()
-        feature_names = archive["feature_names"].astype(str).tolist()
-        target_name = str(archive["target_name"].item())
+        values = archive['values'].astype(np.float32)
+        reference_values = (archive['normalization_values'].astype(np.float32)
+                            if 'normalization_values' in archive else values)
+        target_values = (archive['target_values'].astype(np.float32)
+                         if 'target_values' in archive else reference_values)
+        turbine_ids = archive['turbine_ids'].copy()
+        timestamps = archive['timestamps'].copy()
+        feature_names = archive['feature_names'].astype(str).tolist()
+        target_name = str(archive['target_name'].item())
 
     if target_name not in feature_names:
-        raise ValueError(f"Target {target_name!r} is not in feature_names")
-    t_steps = values.shape[0]
-    train_end = int(t_steps * train_ratio)
-    val_end = int(t_steps * (train_ratio + val_ratio))
-    if train_end <= 0 or val_end >= t_steps:
-        raise ValueError("Invalid chronological split")
+        raise ValueError(f'Target {target_name!r} is not in feature_names')
 
-    train_values = reference_values[:train_end]
+    ranges = check_split(PROTOCOL_SPLIT if split is None else split, values.shape[0])
+    train_start, train_end = ranges['train']
+    train_values = reference_values[train_start:train_end]
+
     feature_median = np.nanmedian(train_values, axis=(0, 1)).astype(np.float32)
     feature_median = np.nan_to_num(feature_median, nan=0.0, posinf=0.0, neginf=0.0)
     filled = np.where(np.isfinite(values), values, feature_median[None, None, :])
@@ -98,24 +136,28 @@ def load_and_prepare(path: str | Path, train_ratio: float = 0.70, val_ratio: flo
         feature_names=feature_names,
         target_mean=target_mean,
         target_std=target_std,
-        train_end=train_end,
-        val_end=val_end,
         feature_mean=feature_mean,
         feature_std=feature_std,
         feature_median=feature_median,
+        split=ranges,
     )
 
 
-def make_splits(data: PreparedData, seq_len: int, pred_len: int):
-    train_starts = list(range(seq_len, data.train_end - pred_len + 1))
-    val_starts = list(range(data.train_end, data.val_end - pred_len + 1))
-    test_starts = list(range(data.val_end, len(data.timestamps) - pred_len + 1))
-    if min(map(len, (train_starts, val_starts, test_starts))) == 0:
-        raise ValueError("Not enough timestamps for the selected sequence and horizon lengths")
-    return (
-        ForecastWindows(data, train_starts, seq_len, pred_len),
-        ForecastWindows(data, val_starts, seq_len, pred_len),
-        ForecastWindows(data, test_starts, seq_len, pred_len),
-    )
+def make_splits(data: PreparedData, seq_len: int, pred_len: int,
+                train_stride: int = 4, evaluation_stride: int = 24):
+    """Clean windows for the three protocol partitions.
 
-
+    The ranges and strides are the ones used for the reported results. The
+    benchmark itself builds its own ``Windows`` objects from ``data.split``
+    because it also needs the corruption settings; the two paths therefore
+    share a single definition of the split.
+    """
+    windows = {}
+    for name in ('train', 'val', 'test'):
+        start, end = data.split[name]
+        stride = train_stride if name == 'train' else evaluation_stride
+        starts = list(range(start, end - pred_len + 1, stride))
+        if not starts:
+            raise ValueError(f'Not enough timestamps for partition {name!r}')
+        windows[name] = ForecastWindows(data, starts, seq_len, pred_len)
+    return windows['train'], windows['val'], windows['test']

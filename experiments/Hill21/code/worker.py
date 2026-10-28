@@ -32,6 +32,7 @@ def main(name,device='cuda',evaluate_only=False,seeds=None,strategies=None):
  core.ROOT=ROOT;core.build=build;torch.set_num_threads(4);torch.backends.cuda.matmul.allow_tf32=False;torch.backends.cudnn.allow_tf32=False
  data=dict(np.load(ROOT/'data/panel.npz'));cfg=json.loads((ROOT/'config.json').read_text());rows=[]
  assert data['x'].shape[1:]==(cfg['num_nodes'],cfg['input_dim'])==(21,7)
+ assert (cfg['history'],cfg['horizon'])==(core.SEQ_LEN,core.PRED_LEN),'config.json window shape drifted'
  for strategy in strategies or ['clean','noise']:
   for seed in seeds or cfg['seeds']:
    path=ROOT/f'runs/{name}/{strategy}/{seed}'
@@ -39,9 +40,11 @@ def main(name,device='cuda',evaluate_only=False,seeds=None,strategies=None):
    model=build(name,21,7,cfg['dropout'],cfg['rho'],device=device)
    load_checkpoint(model,path/'best.pt',ROOT/'checkpoint_metadata')
    model=model.to(device);model.eval()
-   parameters=sum(p.numel()*(2 if p.is_complex() else 1) for p in model.parameters())
+   parameters=core.real_scalars(model)
    for condition in ['clean','corrupted']:
     score=core.evaluate(model,core.Windows(data,'test',condition=condition),path/condition)
+    # Paper Table 5: the test partition has a fixed number of valid prediction points.
+    assert score['valid_points']==core.EXPECTED_VALID_TEST_POINTS,'Valid test point drift'
     rows.append(dict(model=name,strategy=strategy,seed=seed,condition=condition,parameters=parameters,**score))
    dest=PAPER/f'runs/{name}/{strategy}/{seed}';dest.mkdir(parents=True,exist_ok=True)
    for f in ['best.pt','config.json','history.csv','complete.json']:shutil.copy2(path/f,dest/f)
@@ -59,7 +62,7 @@ def main(name,device='cuda',evaluate_only=False,seeds=None,strategies=None):
       torch.cuda.synchronize();torch.cuda.reset_peak_memory_stats();times=[]
       for _ in range(30):
        a=torch.cuda.Event(enable_timing=True);b=torch.cuda.Event(enable_timing=True);a.record();model(x);b.record();torch.cuda.synchronize();times.append(a.elapsed_time(b))
-      measures.append(dict(model=name,seed=seed,batch=batch,parameters=parameters,latency_ms=float(np.median(times)),peak_allocated_MiB=torch.cuda.max_memory_allocated()/2**20,gpu=torch.cuda.get_device_name()))
+      measures.append(dict(model=name,seed=seed,batch=batch,parameters=parameters,warmup=10,repeats=30,latency_ms=float(np.median(times)),peak_allocated_MiB=torch.cuda.max_memory_allocated()/2**20,gpu=torch.cuda.get_device_name()))
       del x
     (dest/'efficiency.json').write_text(json.dumps(measures,indent=2));del sample
    pd.DataFrame(rows).to_csv(PAPER/f'{name}_metrics.csv',index=False)

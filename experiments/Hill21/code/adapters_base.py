@@ -4,7 +4,6 @@ from pathlib import Path
 from types import SimpleNamespace
 import torch
 from torch import nn
-from sgsa_model import SGSA
 from multigsa_adapted import MultiGSAAdapted
 
 VENDOR=Path(__file__).resolve().parents[3]/'vendor'
@@ -54,12 +53,14 @@ class FEDformerAdapter(nn.Module):
         return y[:,:,-1].reshape(b,n,48).permute(0,2,1)
 
 def build(name):
-    if name=='SGSA':return SGSA()
-    if name=='MultiGSA_adapted':return MultiGSAAdapted(96,21,7,48,64,.1)
-    if name in ['LSTM','Transformer']:return Temporal(name)
-    if name=='MTGNN':return MTGNNAdapter()
-    if name=='FEDformer':return FEDformerAdapter()
-    raise ValueError(name)
+ # SGSA is built by worker.build with this protocol's explicit turbine/feature
+ # counts; returning a default-shaped model here would be a silent mismatch.
+ if name=='SGSA':raise ValueError('use worker.build for SGSA (explicit turbine/feature counts)')
+ if name=='MultiGSA_adapted':return MultiGSAAdapted(96,21,7,48,64,.1)
+ if name in ['LSTM','Transformer']:return Temporal(name)
+ if name=='MTGNN':return MTGNNAdapter()
+ if name=='FEDformer':return FEDformerAdapter()
+ raise ValueError(name)
 
 def parameter_counts(model):
     # Complex coefficients need two real scalars; report both conventions.
