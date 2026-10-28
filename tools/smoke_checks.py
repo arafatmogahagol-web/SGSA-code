@@ -86,18 +86,26 @@ def forward_checks(dataset):
                 model = models.build(name, cfg, device='cpu')
             else:
                 import worker
+                worker.validate_protocol(cfg)
                 model = worker.build(name, nodes, feats, cfg['dropout'], cfg['rho'], device='cpu')
             model.eval()
             with torch.no_grad():
                 out = model(x)
             params = sum(p.numel() * (2 if p.is_complex() else 1) for p in model.parameters())
+            shape_ok = tuple(out.shape) == (1, SHAPE[dataset][3], nodes)
+            finite = bool(torch.isfinite(out).all())
             rows.append(dict(dataset=dataset, model=name, output_shape=list(out.shape),
+                             output_shape_matches=shape_ok, finite_output=finite,
                              parameters=params, expected_parameters=expected,
-                             status='checked' if params == expected else 'parameter_mismatch'))
+                             status=('output_mismatch' if not shape_ok or not finite else
+                                     'checked' if params == expected else 'parameter_mismatch')))
             del model
-        except (FileNotFoundError, ImportError, ModuleNotFoundError, AssertionError) as exc:
+        except (FileNotFoundError, ImportError) as exc:
+            # Missing optional priors/upstream source are the only expected skips.
+            # A missing dependency for a core model must fail the check.
+            optional = name in ('PDFormer_train_graph', 'StemGNN_power_only')
             rows.append(dict(dataset=dataset, model=name, parameters=None,
-                             expected_parameters=expected, status='skipped',
+                             expected_parameters=expected, status='skipped' if optional else 'failed',
                              reason=f'{type(exc).__name__}: {exc}'.splitlines()[0][:200]))
         print(f"{dataset:6s} {name:22s} {rows[-1]['status']:18s} {rows[-1].get('parameters')}",
               flush=True)
@@ -115,6 +123,7 @@ def config_checks():
         sdwpf_split_matches_preprocessing=(
             {k: list(v) for k, v in preprocessing.PROTOCOL_SPLIT.items()} == sdwpf['split']),
         hill21_split_matches_audit=(list(hill['split']) == list(audit['boundaries'])),
+        hill21_window_counts_match=(audit['windows'] == dict(train=729, validation=26, test=26)),
         hill21_window_counts=audit['windows'],
         hill21_expected_windows=dict(train=729, validation=26, test=26),
         hill21_expected_valid_test_points=26187,
@@ -139,6 +148,7 @@ def main():
     forward_rows = []
     for dataset in ['SDWPF', 'Hill21']:
         target = ROOT / 'provenance' / f'.smoke_{dataset}.json'
+        target.unlink(missing_ok=True)
         completed = subprocess.run([sys.executable, str(Path(__file__).resolve()),
                                     '--dataset', dataset, '--json', str(target)],
                                    cwd=str(ROOT))

@@ -19,6 +19,7 @@ that earlier scripts used (`sgsa.py`, `model.py`, `sgsa_layers.py`, `layers.py`,
 - `docs/DATA_PROTOCOLS.md`: the two protocols and their differences.
 - `docs/IMPLEMENTATION_NOTES.md`: baseline adaptations and reporting conventions.
 - `docs/DEVELOPMENT_HISTORY.md`: prior exploratory use of the evaluation panels.
+- `docs/EXPERIMENT_REVIEW_20261028.md`: manuscript comparison, repairs and remaining limitations.
 - `vendor/`: licensed third-party implementations with their original notices.
 
 ## Installation
@@ -77,6 +78,7 @@ source is fetched locally and is not redistributed here.
 ```sh
 python tools/verify_sources.py     # packaged file hashes + Python syntax
 python tools/smoke_checks.py       # CPU forward checks, parameter counts vs the paper
+python tools/test_integrity_guards.py  # checkpoint rho, run reuse and window origins
 ```
 `verify_sources.py` checks the packaged hashes and parses every Python file without
 importing models or starting training. `smoke_checks.py` builds every architecture on CPU,

@@ -7,6 +7,16 @@ from sgsa_model import SGSA
 from multigsa_adapted import MultiGSAAdapted
 from sgsa_utils.checkpoints import load_checkpoint
 
+
+def validate_protocol(cfg):
+ expected=dict(num_nodes=21,input_dim=7,d_model=64,graph_rank=16,rho=.25,
+               history=96,horizon=48,learning_rate=.001,dropout=.1,batch_size=32,
+               epochs=50,patience=8,weight_decay=.0001,gradient_clip=1.,
+               selection='validation MAE',metric_scale='training-only z-score',
+               seeds=[2024,2025,2026],split=[0,3058,3713,4369])
+ changed=[key for key,value in expected.items() if cfg.get(key)!=value]
+ if changed:raise ValueError('Hill21 config disagrees with the paper protocol: '+', '.join(changed))
+
 def build(name,n,f,drop,rho=.25,device='cuda'):
  if name=='SGSA':return SGSA(96,n,f,48,64,drop,16,rho)
  if name=='MultiGSA_adapted':return MultiGSAAdapted(96,n,f,48,64,drop)
@@ -31,6 +41,7 @@ def main(name,device='cuda',evaluate_only=False,seeds=None,strategies=None):
  if device=='cpu' and not evaluate_only:raise ValueError('CPU is supported for frozen evaluation only.')
  core.ROOT=ROOT;core.build=build;torch.set_num_threads(4);torch.backends.cuda.matmul.allow_tf32=False;torch.backends.cudnn.allow_tf32=False
  data=dict(np.load(ROOT/'data/panel.npz'));cfg=json.loads((ROOT/'config.json').read_text());rows=[]
+ validate_protocol(cfg)
  assert data['x'].shape[1:]==(cfg['num_nodes'],cfg['input_dim'])==(21,7)
  assert (cfg['history'],cfg['horizon'])==(core.SEQ_LEN,core.PRED_LEN),'config.json window shape drifted'
  for strategy in strategies or ['clean','noise']:

@@ -68,3 +68,15 @@ Two regenerable checks cover the current tree:
   point, writing `provenance/smoke_checks.json`.
 
 `python tools/update_manifest.py` regenerates the hash manifest after an intentional edit.
+
+## Checkpoint and run identity
+New checkpoints include a hash-bound residual coefficient in their metadata, so
+loading weights trained with a different rho fails. Plain historical state dictionaries
+do not encode rho; they remain compatible, but their coefficient still requires the
+original experiment records. Source edits cannot recover missing historical metadata.
+Existing run configurations are checked before training reuse, including the SDWPF
+shuffle choice. Use a separate run directory for changed settings.
+
+`python tools/test_integrity_guards.py` exercises these protections and verifies that
+the clean split helper has the same origins as the benchmark. The review against the
+supplied manuscript is recorded in `docs/EXPERIMENT_REVIEW_20261028.md`.

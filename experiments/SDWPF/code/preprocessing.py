@@ -156,7 +156,8 @@ def make_splits(data: PreparedData, seq_len: int, pred_len: int,
     for name in ('train', 'val', 'test'):
         start, end = data.split[name]
         stride = train_stride if name == 'train' else evaluation_stride
-        starts = list(range(start, end - pred_len + 1, stride))
+        # A forecast origin must have a complete history, including at train start.
+        starts = list(range(max(start, seq_len), end - pred_len + 1, stride))
         if not starts:
             raise ValueError(f'Not enough timestamps for partition {name!r}')
         windows[name] = ForecastWindows(data, starts, seq_len, pred_len)

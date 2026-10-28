@@ -1,14 +1,15 @@
 {
-  "generated": "2026-10-28T17:24:34",
+  "generated": "2026-10-28T18:09:54",
   "platform": "Windows-11-10.0.26200-SP0",
   "python": "3.12.4",
   "torch": "2.6.0+cu124",
   "cuda_available": false,
   "training_started": false,
-  "python_sources_parsed": 326,
+  "python_sources_parsed": 327,
   "config_checks": {
     "sdwpf_split_matches_preprocessing": true,
     "hill21_split_matches_audit": true,
+    "hill21_window_counts_match": true,
     "hill21_window_counts": {
       "train": 729,
       "validation": 26,
@@ -73,6 +74,8 @@
         48,
         134
       ],
+      "output_shape_matches": true,
+      "finite_output": true,
       "parameters": 23216,
       "expected_parameters": 23216,
       "status": "checked"
@@ -85,6 +88,8 @@
         48,
         134
       ],
+      "output_shape_matches": true,
+      "finite_output": true,
       "parameters": 34033,
       "expected_parameters": 34033,
       "status": "checked"
@@ -97,6 +102,8 @@
         48,
         134
       ],
+      "output_shape_matches": true,
+      "finite_output": true,
       "parameters": 75056,
       "expected_parameters": 75056,
       "status": "checked"
@@ -109,6 +116,8 @@
         48,
         134
       ],
+      "output_shape_matches": true,
+      "finite_output": true,
       "parameters": 81584,
       "expected_parameters": 81584,
       "status": "checked"
@@ -121,6 +130,8 @@
         48,
         134
       ],
+      "output_shape_matches": true,
+      "finite_output": true,
       "parameters": 5264032,
       "expected_parameters": 5264032,
       "status": "checked"
@@ -133,6 +144,8 @@
         48,
         134
       ],
+      "output_shape_matches": true,
+      "finite_output": true,
       "parameters": 225040,
       "expected_parameters": 225040,
       "status": "checked"
@@ -145,6 +158,8 @@
         48,
         134
       ],
+      "output_shape_matches": true,
+      "finite_output": true,
       "parameters": 764520,
       "expected_parameters": 764520,
       "status": "checked"
@@ -157,6 +172,8 @@
         48,
         134
       ],
+      "output_shape_matches": true,
+      "finite_output": true,
       "parameters": 807020,
       "expected_parameters": 807020,
       "status": "checked"
@@ -169,6 +186,8 @@
         48,
         134
       ],
+      "output_shape_matches": true,
+      "finite_output": true,
       "parameters": 163184,
       "expected_parameters": 163184,
       "status": "checked"
@@ -181,6 +200,8 @@
         48,
         134
       ],
+      "output_shape_matches": true,
+      "finite_output": true,
       "parameters": 9312,
       "expected_parameters": 9312,
       "status": "checked"
@@ -193,6 +214,8 @@
         48,
         134
       ],
+      "output_shape_matches": true,
+      "finite_output": true,
       "parameters": 105746,
       "expected_parameters": 105746,
       "status": "checked"
@@ -221,6 +244,8 @@
         48,
         21
       ],
+      "output_shape_matches": true,
+      "finite_output": true,
       "parameters": 19024,
       "expected_parameters": 19024,
       "status": "checked"
@@ -233,6 +258,8 @@
         48,
         21
       ],
+      "output_shape_matches": true,
+      "finite_output": true,
       "parameters": 29841,
       "expected_parameters": 29841,
       "status": "checked"
@@ -245,6 +272,8 @@
         48,
         21
       ],
+      "output_shape_matches": true,
+      "finite_output": true,
       "parameters": 74480,
       "expected_parameters": 74480,
       "status": "checked"
@@ -257,6 +286,8 @@
         48,
         21
       ],
+      "output_shape_matches": true,
+      "finite_output": true,
       "parameters": 81008,
       "expected_parameters": 81008,
       "status": "checked"
@@ -269,6 +300,8 @@
         48,
         21
       ],
+      "output_shape_matches": true,
+      "finite_output": true,
       "parameters": 1988112,
       "expected_parameters": 1988112,
       "status": "checked"
@@ -281,6 +314,8 @@
         48,
         21
       ],
+      "output_shape_matches": true,
+      "finite_output": true,
       "parameters": 219271,
       "expected_parameters": 219271,
       "status": "checked"
@@ -293,6 +328,8 @@
         48,
         21
       ],
+      "output_shape_matches": true,
+      "finite_output": true,
       "parameters": 761684,
       "expected_parameters": 761684,
       "status": "checked"
@@ -305,6 +342,8 @@
         48,
         21
       ],
+      "output_shape_matches": true,
+      "finite_output": true,
       "parameters": 771330,
       "expected_parameters": 771330,
       "status": "checked"
@@ -317,6 +356,8 @@
         48,
         21
       ],
+      "output_shape_matches": true,
+      "finite_output": true,
       "parameters": 104272,
       "expected_parameters": 104272,
       "status": "checked"
@@ -329,6 +370,8 @@
         48,
         21
       ],
+      "output_shape_matches": true,
+      "finite_output": true,
       "parameters": 9312,
       "expected_parameters": 9312,
       "status": "checked"
@@ -341,6 +384,8 @@
         48,
         21
       ],
+      "output_shape_matches": true,
+      "finite_output": true,
       "parameters": 105728,
       "expected_parameters": 105728,
       "status": "checked"

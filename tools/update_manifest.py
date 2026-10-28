@@ -7,6 +7,7 @@ Excluded: the manifest itself, Git internals, caches, datasets, checkpoints, gen
 outputs and the separately fetched StemGNN source.
 """
 from pathlib import Path
+import argparse
 import hashlib
 import json
 
@@ -35,6 +36,7 @@ def wanted(relative):
 
 
 def main():
+    argparse.ArgumentParser(description=__doc__).parse_args()
     entries = {}
     for path in sorted(ROOT.rglob('*')):
         if not path.is_file():

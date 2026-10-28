@@ -11,6 +11,7 @@ import numpy as np
 import torch
 from model import SGSA
 from data_loader import load_and_prepare, Windows, loader
+from sgsa_utils.checkpoints import load_checkpoint
 
 ROOT = Path(__file__).resolve().parents[1]
 CFG = json.loads((ROOT / 'config.json').read_text(encoding='utf-8'))
@@ -23,6 +24,8 @@ def evaluate(model, dataset, save=None):
     arrays = {k: [] for k in ['prediction', 'target', 'mask', 'starts']}
     for x, y, m, starts, _ in loader(dataset):
         pred = model(x.cuda()).cpu()
+        if not torch.isfinite(pred).all():
+            raise ValueError('Nonfinite predictions')
         valid = m.bool()
         e = (pred.double() - y.double())[valid]
         absolute += e.abs().sum().item()
@@ -56,11 +59,14 @@ if __name__ == '__main__':
         raise ValueError('Protocol requires the audited 20000-point array')
     model = SGSA(CFG['seq_len'], CFG['num_nodes'], CFG['input_dim'], CFG['pred_len'],
                  CFG['d_model'], CFG['dropout'], CFG['graph_rank'], CFG['rho']).cuda()
-    model.load_state_dict(torch.load(a.checkpoint, map_location='cpu', weights_only=True), strict=True)
+    checkpoint_record = load_checkpoint(model, a.checkpoint)
     ds = Windows.for_partition(data, 'test', seed=CFG['corruption_seed'],
                                augmentation=False, stride=CFG['evaluation_stride'],
                                severity=None if a.condition == 'clean' else 2,
                                seq_len=CFG['seq_len'], pred_len=CFG['pred_len'])
     result = evaluate(model, ds, out / 'predictions.npz')
+    if result['valid_points'] != 966746:
+        raise ValueError('Valid test point drift from paper Table 2')
+    result['checkpoint'] = checkpoint_record
     (out / 'metrics.json').write_text(json.dumps(result, indent=2))
     print(result)

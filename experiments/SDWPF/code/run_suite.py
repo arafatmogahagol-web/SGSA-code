@@ -42,7 +42,7 @@ import matplotlib.pyplot as plt
 from data_loader import load_and_prepare, Windows, loader
 from models import NAMES, build, parameter_counts, frequency_indices
 from preprocessing import PROTOCOL_SPLIT
-from sgsa_utils.checkpoints import load_checkpoint, save_checkpoint
+from sgsa_utils.checkpoints import load_checkpoint, save_checkpoint, validate_run_config
 
 ROOT = Path(__file__).resolve().parents[1]
 WORK = ROOT / 'runs'
@@ -54,6 +54,8 @@ CONFIG = json.loads((ROOT / 'config.json').read_text(encoding='utf-8'))
 FROZEN = dict(seq_len=96, pred_len=48, num_nodes=134, input_dim=16, d_model=64,
               graph_rank=16, rho=0.25, dropout=0.1, batch_size=32, epochs=30,
               patience=5, learning_rate=0.0005, weight_decay=0.0001,
+              gradient_clip=1.0, selection='validation MSE', metric_scale='training-only z-score',
+              augmentation_seed=2024, validation_noise_seed=502024, corruption_seed=910024,
               seeds=[2024, 2025, 2026], train_stride=4, evaluation_stride=24,
               split={'train': [0, 14000], 'val': [14000, 15000],
                      'unused': [15000, 16000], 'test': [16000, 20000]})
@@ -342,6 +344,10 @@ def train_one(name, strategy, seed, reshuffle_each_epoch=False):
     out = PAPER / name / strategy / str(seed)
     run.mkdir(parents=True, exist_ok=True)
     out.mkdir(parents=True, exist_ok=True)
+    identity = dict(CFG, model=name, strategy=strategy, seed=seed,
+                    micro_batch=micro, reshuffle_each_epoch=reshuffle_each_epoch)
+    validate_run_config(out / 'config.json', identity,
+                        [run / 'last.pt', run / 'best.pt', out / 'complete.json'])
     if (out / 'complete.json').exists():
         return
     data = load_data()
@@ -418,7 +424,7 @@ def train_one(name, strategy, seed, reshuffle_each_epoch=False):
                                          epoch=epoch, history=history, best=best, stale=stale,
                                          rng=rng_state(), frequency_indices=initial_indices))
         plot_loss(history, out / 'loss')
-    model.load_state_dict(torch.load(run / 'best.pt', map_location='cpu', weights_only=True), strict=True)
+    load_checkpoint(model, run / 'best.pt')
     dump(out / 'checkpoint.json', dict(sha256=sha(run / 'best.pt'), best_val_mse=best,
                                        epochs_run=len(history),
                                        frequency_indices=initial_indices))

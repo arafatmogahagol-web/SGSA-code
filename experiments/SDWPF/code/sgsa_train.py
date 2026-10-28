@@ -15,6 +15,7 @@ import torch
 from model import SGSA
 from data_loader import load_and_prepare, Windows
 from sgsa_evaluate import evaluate
+from sgsa_utils.checkpoints import save_checkpoint
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -29,6 +30,10 @@ def main():
     a = p.parse_args()
     if not torch.cuda.is_available():
         raise RuntimeError('CUDA required')
+    torch.set_num_threads(4)
+    torch.backends.cuda.matmul.allow_tf32 = False
+    torch.backends.cudnn.allow_tf32 = False
+    torch.backends.cudnn.benchmark = False
     cfg = json.loads(Path(a.config).read_text())
     if not cfg.get('training_authorized', False):
         raise RuntimeError('Protocol draft: training is not yet authorized')
@@ -74,6 +79,8 @@ def main():
             opt.zero_grad(set_to_none=True)
             e = (model(x) - y)[m]
             loss = e.square().mean()
+            if not torch.isfinite(loss):
+                raise ValueError('Nonfinite training loss')
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.get('gradient_clip', 1.0))
             opt.step()
@@ -90,7 +97,7 @@ def main():
         if score < best:
             best = score
             stale = 0
-            torch.save(model.state_dict(), out / 'best.pt')
+            save_checkpoint(model, out / 'best.pt')
         else:
             stale += 1
         print(history[-1], flush=True)

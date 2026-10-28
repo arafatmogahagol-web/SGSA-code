@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset,DataLoader
 sys.path.insert(0,str(Path(__file__).resolve().parents[3]))
-from sgsa_utils.checkpoints import save_checkpoint
+from sgsa_utils.checkpoints import save_checkpoint, validate_run_config
 # Model factory is supplied explicitly by worker.py
 ROOT=Path(__file__).resolve().parents[1]; PAPER=ROOT/'outputs'
 # Window shape and the paper's valid-test-point count (Table 5).
@@ -41,6 +41,7 @@ def evaluate(model,ds,save=None):
  model.eval();sa=ss=count=0;ah=np.zeros(PRED_LEN);sh=ah.copy();ch=ah.copy();pred=[];target=[];mask=[];times=[]
  for x,y,m,t in loader(ds,False,0):
   p=model(x.to(next(model.parameters()).device)).cpu().numpy();yy=y.numpy();mm=m.numpy();e=p-yy
+  if not np.isfinite(p).all():raise ValueError('Nonfinite predictions')
   sa+=np.abs(e)[mm].sum(dtype=np.float64);ss+=np.square(e)[mm].sum(dtype=np.float64);count+=int(mm.sum())
   ah+=(np.abs(e)*mm).sum((0,2));sh+=(e**2*mm).sum((0,2));ch+=mm.sum((0,2))
   if save is not None:pred.append(p);target.append(yy);mask.append(mm);times.extend(t.numpy().tolist())
@@ -52,6 +53,8 @@ def evaluate(model,ds,save=None):
  return d
 
 def train(name,cfg,seed,strategy,path,data):
+ expected=dict(cfg,seed=seed,strategy=strategy,model=name,rho=cfg.get('rho',.25) if name=='SGSA' else None)
+ validate_run_config(path/'config.json',expected,[path/'complete.json',path/'best.pt'])
  if (path/'complete.json').exists():
   saved=json.loads((path/'config.json').read_text())
   for key in ['learning_rate','dropout']:
@@ -70,6 +73,7 @@ def train(name,cfg,seed,strategy,path,data):
    loss=e.square().mean()
    if not torch.isfinite(loss):raise ValueError('Nonfinite loss')
    loss.backward();torch.nn.utils.clip_grad_norm_(model.parameters(),cfg.get('gradient_clip',1));opt.step();ss+=float(e.detach().square().sum());count+=e.numel()
+  if not count:raise ValueError('No valid training labels')
   score=evaluate(model,val);history.append(dict(epoch=epoch,train_mse=ss/count,val_mae=score['mae'],val_rmse=score['rmse'],seconds=time.time()-tick))
   with (path/'history.csv').open('w',newline='') as f:w=csv.DictWriter(f,fieldnames=list(history[-1]));w.writeheader();w.writerows(history)
   print(name,strategy,seed,cfg,history[-1],flush=True)

@@ -5,6 +5,27 @@ import json
 import torch
 
 
+def residual_coefficients(model):
+    """Non-tensor SGSA coefficients are part of checkpoint identity too."""
+    return {name: float(module.rho) for name, module in model.named_modules()
+            if hasattr(module, 'rho') and isinstance(module.rho, (int, float))}
+
+
+def validate_run_config(path, expected, artifacts=()):
+    """Refuse to reuse completed/partial runs with a different protocol."""
+    path = Path(path)
+    if not path.exists():
+        if any(Path(p).exists() for p in artifacts):
+            raise ValueError('Existing run lacks configuration: ' + str(path))
+        return
+    saved = json.loads(path.read_text(encoding='utf-8'))
+    changed = [key for key, value in expected.items()
+               if key not in saved or saved[key] != value]
+    if changed:
+        raise ValueError('Existing run configuration differs on: ' + ', '.join(changed)
+                         + '. Use a separate run directory.')
+
+
 def sha256(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
@@ -46,8 +67,9 @@ def save_checkpoint(model, path):
     temporary = path.with_suffix(path.suffix + '.tmp')
     torch.save(model.state_dict(), temporary)
     temporary.replace(path)
-    metadata = {'schema_version': 1, 'checkpoint_sha256': sha256(path),
-                'frequency_indices': frequency_indices(model)}
+    metadata = {'schema_version': 2, 'checkpoint_sha256': sha256(path),
+                'frequency_indices': frequency_indices(model),
+                'residual_coefficients': residual_coefficients(model)}
     sidecar = path.with_suffix(path.suffix + '.metadata.json')
     temporary = sidecar.with_suffix(sidecar.suffix + '.tmp')
     temporary.write_text(json.dumps(metadata, indent=2), encoding='utf-8')
@@ -69,6 +91,9 @@ def load_checkpoint(model, path, recovery_dir=None):
                 break
     if metadata is not None and metadata.get('checkpoint_sha256') != digest:
         raise ValueError('Checkpoint hash does not match its Fourier metadata')
+    if metadata is not None and 'residual_coefficients' in metadata:
+        if metadata['residual_coefficients'] != residual_coefficients(model):
+            raise ValueError('Checkpoint residual coefficient (rho) does not match the model')
     if frequency_indices(model):
         if metadata is None:
             raise ValueError('Missing Fourier metadata. Supply the original hash-matched '
@@ -76,4 +101,5 @@ def load_checkpoint(model, path, recovery_dir=None):
         restore_frequency_indices(model, metadata['frequency_indices'])
     state = torch.load(path, map_location='cpu', weights_only=True)
     model.load_state_dict(state, strict=True)
-    return {'checkpoint_sha256': digest, 'frequency_indices': frequency_indices(model)}
+    return {'checkpoint_sha256': digest, 'frequency_indices': frequency_indices(model),
+            'rho_verified': metadata is not None and 'residual_coefficients' in metadata}
